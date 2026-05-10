@@ -152,7 +152,6 @@
                     if (isPlain(window.CASHIER_PASSWORD))       { window.CASHIER_PASSWORD       = await sha256(window.CASHIER_PASSWORD);       needsMigration = true; }
                     if (isPlain(window.FINANCE_HEAD_PASSWORD))  { window.FINANCE_HEAD_PASSWORD  = await sha256(window.FINANCE_HEAD_PASSWORD);  needsMigration = true; }
                     if (isPlain(window.DEFAULT_DEPT_PASSWORD))  { window.DEFAULT_DEPT_PASSWORD  = await sha256(window.DEFAULT_DEPT_PASSWORD);  needsMigration = true; }
-                    if (!window.TEACHER_PASSWORD)               { window.TEACHER_PASSWORD       = await sha256('Teacher@HMI2026');             needsMigration = true; }
                     if (isPlain(window.TEACHER_PASSWORD))       { window.TEACHER_PASSWORD       = await sha256(window.TEACHER_PASSWORD);       needsMigration = true; }
                     if (isPlain(window.SERVER_ACCESS_PASSWORD)) { window.SERVER_ACCESS_PASSWORD = await sha256(window.SERVER_ACCESS_PASSWORD); needsMigration = true; }
                     for (const dept of Object.keys(window.deptHeadPasswords || {})) {
@@ -252,6 +251,60 @@
             await fbSavePasswords();
             await fbSavePermSettings();
             showSyncStatus('\u2705 All data saved to cloud', '#4caf50');
+        }
+
+        /* ══════════════════════════════════════════════
+           SHARED PRINT HELPER
+           Call: printSection(titleText, contentHtml)
+           Opens a clean print window with the table/content.
+        ══════════════════════════════════════════════ */
+        function printSection(title, contentHtml) {
+            const w = window.open('', '_blank', 'width=900,height=700');
+            if (!w) { alert('Please allow pop-ups to print.'); return; }
+            const now = new Date();
+            const dateStr = now.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+            const timeStr = now.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+            w.document.write(`<!DOCTYPE html><html><head>
+                <title>${title}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 24px; color: #111; font-size: 12px; }
+                    h2 { font-size: 16px; margin: 0 0 4px; }
+                    .print-meta { color: #555; font-size: 11px; margin-bottom: 16px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+                    th { background: #1a3a5c; color: #fff; padding: 7px 8px; text-align: left; border: 1px solid #999; }
+                    td { padding: 5px 8px; border: 1px solid #ccc; background: #fff; }
+                    tr:nth-child(even) td { background: #f4f7fb; }
+                    .sql-table-wrap { overflow: visible; }
+                    .print-footer { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 8px; color: #777; font-size: 10px; text-align: center; }
+                    .print-date-stamp { display:none; }
+                    @media print {
+                        button { display: none; }
+                        .print-date-stamp {
+                            display: block;
+                            position: fixed;
+                            top: 0; right: 0;
+                            font-size: 10px;
+                            color: #444;
+                            text-align: right;
+                            padding: 4px 8px;
+                            border-bottom: 1px solid #ccc;
+                            width: 100%;
+                            background: #fff;
+                            box-sizing: border-box;
+                        }
+                        body { margin-top: 36px; }
+                    }
+                </style>
+            </head><body>
+                <div class="print-date-stamp">📅 ${dateStr} &nbsp; 🕐 ${timeStr} &nbsp;|&nbsp; Beyond Our Dreams University</div>
+                <h2>🏫 Beyond Our Dreams University — ${title}</h2>
+                <div class="print-meta">System: RVU Relational HMI ${window.SYSTEM_VERSION || ''}</div>
+                ${contentHtml}
+                <div class="print-footer">Beyond Our Dreams University &nbsp;|&nbsp; Confidential — Authorised Personnel Only</div>
+                <br><button onclick="window.print()" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:13px;">🖨️ Print</button>
+            </body></html>`);
+            w.document.close();
+            w.focus();
         }
 
         /* ── Audit Trail ── */
@@ -682,8 +735,10 @@
            Enforces: student id → full name → year → semester → level → classification → department → rest */
         window.studentColOrder = function(cols) {
             const priority = ['student id', 'full name', 'year', 'semester', 'level', 'classification', 'department'];
-            const fixed = priority.filter(c => cols.includes(c));
-            const rest  = cols.filter(c => !priority.includes(c)).sort();
+            /* case-insensitive matching */
+            const lower = cols.map(c => c.toLowerCase());
+            const fixed = priority.filter(p => lower.includes(p)).map(p => cols[lower.indexOf(p)]);
+            const rest  = cols.filter(c => !priority.includes(c.toLowerCase())).sort();
             return [...fixed, ...rest];
         };
     </script>
@@ -930,7 +985,7 @@
     <div id="verifyLookupPanel" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9001; flex-direction:column; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
         <div style="width:100%; max-width:600px; background:#1a1a2e; border:2px solid #4fc3f7; border-radius:12px; padding:24px;">
             <h2 style="color:#4fc3f7; margin:0 0 16px 0; font-size:1.1rem;">&#128270; Verify Student Report Code</h2>
-            <input id="verifyInput" type="text" placeholder="Enter verification code e.g. RVU-070-23-..." 
+            <input id="verifyInput" type="text" placeholder="Enter your verification code" 
                 style="width:100%; padding:10px; border-radius:6px; border:1px solid #444; background:#111; color:white; font-size:0.9rem; box-sizing:border-box; margin-bottom:10px; font-family:monospace;">
             <div style="display:flex; gap:8px; margin-bottom:16px;">
                 <button onclick="lookupVerifyCode()" style="flex:1; background:#0078d7; color:white; border:none; border-radius:6px; padding:10px; font-weight:bold; cursor:pointer;">&#128270; VERIFY</button>
@@ -966,7 +1021,10 @@
         <div style="width:100%; max-width:900px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                 <h2 style="color:#4fc3f7; margin:0; font-size:1.1rem;">&#128221; System Audit Log (Last 200 actions)</h2>
-                <button onclick="window.closeAuditLog()" style="background:#cc0000; color:white; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-weight:bold;">CLOSE</button>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="printSection('System Audit Log', document.getElementById('auditLogPanel').querySelector('table').outerHTML)" style="background:#1a3a5c; color:#4fc3f7; border:1px solid #4fc3f7; border-radius:6px; padding:6px 14px; cursor:pointer; font-weight:bold; font-size:0.75rem; text-transform:none; letter-spacing:0;">🖨️ Print</button>
+                    <button onclick="window.closeAuditLog()" style="background:#cc0000; color:white; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-weight:bold;">CLOSE</button>
+                </div>
             </div>
             <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
                 <thead>
@@ -1244,6 +1302,8 @@
             </div>
             <hr style="border-color:#333; margin:20px 0 14px;">
             <p style="color:#888; font-size:0.78rem; margin-bottom:8px;" data-i18n="pw-change-label">Change Password</p>
+            <input type="password" id="oldPassword0" placeholder="Current password"
+                style="width:100%; padding:8px; border-radius:8px; border:2px solid #333; background:#111; color:#fff; font-size:0.88rem; box-sizing:border-box; text-align:center; margin-bottom:8px; outline:none;">
             <input type="password" id="newPassword1" placeholder="New password" data-i18n="pw-new-placeholder"
                 style="width:100%; padding:8px; border-radius:8px; border:2px solid #333; background:#111; color:#fff; font-size:0.88rem; box-sizing:border-box; text-align:center; margin-bottom:8px; outline:none;">
             <input type="password" id="newPassword2" placeholder="Confirm new password" data-i18n="pw-confirm-placeholder"
@@ -1665,155 +1725,9 @@
 
         let studentListData = []; /* populated from registrationDB on load */
 
-        const courseScoreData = {
-            "Year 1-Sem I": [
-                {"student id": "011/23", "English com.": "83", "Mathematics": "90", "critical thinking": "80", "Physics": "77", "Physical Health": "90"},
-                {"student id": "070/23", "English com.": "97", "MATH101": "85", "PHED101": "98", "PHIL101": "98", "PHYS101": "85"},
-                {"student id": "073/23", "ENGL101": "90", "MATH101": "97", "PHED101": "90", "PHIL101": "72", "PHYS101": "82"},
-                {"student id": "076/23", "ENGL101": "80", "MATH101": "97", "PHED101": "80", "PHIL101": "77", "PHYS101": "68"},
-                {"student id": "110/23", "ENGL101": "72", "MATH101": "85", "PHED101": "98", "PHIL101": "85", "PHYS101": "72"},
-                {"student id": "113/23", "ENGL101": "97", "MATH101": "97", "PHED101": "80", "PHIL101": "65", "PHYS101": "85"},
-                {"student id": "115/23", "ENGL101": "80", "MATH101": "65", "PHED101": "80", "PHIL101": "72", "PHYS101": "90"}
-            ],
-            "Year 1-Sem II": [
-                {"student id": "011/23", "GEOG102": "65", "HIST102": "85", "MATH102": "85", "PSYC102": "85"},
-                {"student id": "070/23", "GEOG102": "97", "HIST102": "97", "MATH102": "90", "PSYC102": "97"},
-                {"student id": "073/23", "GEOG102": "77", "HIST102": "90", "MATH102": "77", "PSYC102": "72"},
-                {"student id": "076/23", "GEOG102": "72", "HIST102": "90", "MATH102": "72", "PSYC102": "97"},
-                {"student id": "110/23", "GEOG102": "72", "HIST102": "72", "MATH102": "77", "PSYC102": "72"},
-                {"student id": "113/23", "GEOG102": "77", "HIST102": "90", "MATH102": "90", "PSYC102": "85"},
-                {"student id": "115/23", "GEOG102": "97", "HIST102": "77", "MATH102": "72", "PSYC102": "72"}
-            ],
-            "Year 1-Sem III": [
-                {"student id": "011/23", "COMP103": "97", "MATH103": "72"},
-                {"student id": "070/23", "COMP103": "97", "MATH103": "85"},
-                {"student id": "073/23", "COMP103": "77", "MATH103": "72"},
-                {"student id": "076/23", "COMP103": "97", "MATH103": "85"},
-                {"student id": "110/23", "COMP103": "90", "MATH103": "77"},
-                {"student id": "113/23", "COMP103": "72", "MATH103": "90"},
-                {"student id": "115/23", "COMP103": "85", "MATH103": "85"}
-            ],
-            "Year 2-Sem I": [
-                {"student id": "011/23", "COMP201": "68", "COMP202": "68", "COMP203": "80", "MATH201": "68"},
-                {"student id": "070/23", "COMP201": "90", "COMP202": "90", "COMP203": "97", "MATH201": "97"},
-                {"student id": "073/23", "COMP201": "72", "COMP202": "97", "COMP203": "85", "MATH201": "80"},
-                {"student id": "076/23", "COMP201": "72", "COMP202": "85", "COMP203": "97", "MATH201": "77"},
-                {"student id": "110/23", "COMP201": "77", "COMP202": "77", "COMP203": "97", "MATH201": "90"},
-                {"student id": "113/23", "COMP201": "80", "COMP202": "72", "COMP203": "85", "MATH201": "85"},
-                {"student id": "115/23", "COMP201": "85", "COMP202": "90", "COMP203": "90", "MATH201": "68"}
-            ],
-            "Year 2-Sem II": [
-                {"student id": "011/23", "COMP204": "97", "COMP205": "72", "COMP206": "90"},
-                {"student id": "070/23", "COMP204": "97", "COMP205": "90", "COMP206": "97"},
-                {"student id": "073/23", "COMP204": "90", "COMP205": "80", "COMP206": "68"},
-                {"student id": "076/23", "COMP204": "90", "COMP205": "68", "COMP206": "68"},
-                {"student id": "110/23", "COMP204": "97", "COMP205": "80", "COMP206": "80"},
-                {"student id": "113/23", "COMP204": "72", "COMP205": "97", "COMP206": "77"},
-                {"student id": "115/23", "COMP204": "90", "COMP205": "80", "COMP206": "72"}
-            ],
-            "Year 2-Sem III": [
-                {"student id": "011/23", "COMP207": "80", "COMP208": "72", "COMP209": "72"},
-                {"student id": "070/23", "COMP207": "85", "COMP208": "80", "COMP209": "77"},
-                {"student id": "073/23", "COMP207": "77", "COMP208": "97", "COMP209": "68"},
-                {"student id": "076/23", "COMP207": "72", "COMP208": "97", "COMP209": "90"},
-                {"student id": "110/23", "COMP207": "80", "COMP208": "90", "COMP209": "90"},
-                {"student id": "113/23", "COMP207": "80", "COMP208": "68", "COMP209": "90"},
-                {"student id": "115/23", "COMP207": "72", "COMP208": "72", "COMP209": "72"}
-            ],
-            "Year 3-Sem I": [
-                {"student id": "011/23", "COMP301": "72", "COMP302": "80", "COMP303": "90"},
-                {"student id": "070/23", "COMP301": "77", "COMP302": "80", "COMP303": "77"},
-                {"student id": "073/23", "COMP301": "80", "COMP302": "90", "COMP303": "80"},
-                {"student id": "076/23", "COMP301": "68", "COMP302": "97", "COMP303": "80"},
-                {"student id": "110/23", "COMP301": "80", "COMP302": "72", "COMP303": "90"},
-                {"student id": "113/23", "COMP301": "90", "COMP302": "97", "COMP303": "72"},
-                {"student id": "115/23", "COMP301": "85", "COMP302": "85", "COMP303": "97"}
-            ],
-            "Year 3-Sem II": [
-                {"student id": "011/23", "COMP304": "72", "COMP305": "97", "COMP306": "85", "COMP307": "90"},
-                {"student id": "070/23", "COMP304": "77", "COMP305": "77", "COMP306": "80", "COMP307": "77"},
-                {"student id": "073/23", "COMP304": "85", "COMP305": "68", "COMP306": "77", "COMP307": "85"},
-                {"student id": "076/23", "COMP304": "77", "COMP305": "80", "COMP306": "90", "COMP307": "85"},
-                {"student id": "110/23", "COMP304": "68", "COMP305": "80", "COMP306": "72", "COMP307": "72"},
-                {"student id": "113/23", "COMP304": "80", "COMP305": "80", "COMP306": "90", "COMP307": "90"},
-                {"student id": "115/23", "COMP304": "97", "COMP305": "77", "COMP306": "80", "COMP307": "85"}
-            ]
-        };
+        const courseScoreData = {}; /* populated from Firebase on load */
 
-        const gradeData = {
-            "Year 1-Sem I": [
-                {"student id": "011/23", "ENGL101": "B+", "MATH101": "A", "PHED101": "B", "PHIL101": "C+", "PHYS101": "A"},
-                {"student id": "070/23", "ENGL101": "A+", "MATH101": "B+", "PHED101": "A+", "PHIL101": "A+", "PHYS101": "B+"},
-                {"student id": "073/23", "ENGL101": "A", "MATH101": "A+", "PHED101": "A", "PHIL101": "C", "PHYS101": "B"},
-                {"student id": "076/23", "ENGL101": "B", "MATH101": "A+", "PHED101": "B", "PHIL101": "C+", "PHYS101": "D"},
-                {"student id": "110/23", "ENGL101": "C", "MATH101": "B+", "PHED101": "A+", "PHIL101": "B+", "PHYS101": "C"},
-                {"student id": "113/23", "ENGL101": "A+", "MATH101": "A+", "PHED101": "B", "PHIL101": "D", "PHYS101": "B+"},
-                {"student id": "115/23", "ENGL101": "B", "MATH101": "D", "PHED101": "B", "PHIL101": "C", "PHYS101": "A"}
-            ],
-            "Year 1-Sem II": [
-                {"student id": "011/23", "GEOG102": "D", "HIST102": "B+", "MATH102": "B+", "PSYC102": "B+"},
-                {"student id": "070/23", "GEOG102": "A+", "HIST102": "A+", "MATH102": "A", "PSYC102": "A+"},
-                {"student id": "073/23", "GEOG102": "C+", "HIST102": "A", "MATH102": "C+", "PSYC102": "C"},
-                {"student id": "076/23", "GEOG102": "C", "HIST102": "A", "MATH102": "C", "PSYC102": "A+"},
-                {"student id": "110/23", "GEOG102": "C", "HIST102": "C", "MATH102": "C+", "PSYC102": "C"},
-                {"student id": "113/23", "GEOG102": "C+", "HIST102": "A", "MATH102": "A", "PSYC102": "B+"},
-                {"student id": "115/23", "GEOG102": "A+", "HIST102": "C+", "MATH102": "C", "PSYC102": "C"}
-            ],
-            "Year 1-Sem III": [
-                {"student id": "011/23", "COMP103": "A+", "MATH103": "C"},
-                {"student id": "070/23", "COMP103": "A+", "MATH103": "B+"},
-                {"student id": "073/23", "COMP103": "C+", "MATH103": "C"},
-                {"student id": "076/23", "COMP103": "A+", "MATH103": "B+"},
-                {"student id": "110/23", "COMP103": "A", "MATH103": "C+"},
-                {"student id": "113/23", "COMP103": "C", "MATH103": "A"},
-                {"student id": "115/23", "COMP103": "B+", "MATH103": "B+"}
-            ],
-            "Year 2-Sem I": [
-                {"student id": "011/23", "COMP201": "D", "COMP202": "D", "COMP203": "B", "MATH201": "D"},
-                {"student id": "070/23", "COMP201": "A", "COMP202": "A", "COMP203": "A+", "MATH201": "A+"},
-                {"student id": "073/23", "COMP201": "C", "COMP202": "A+", "COMP203": "B+", "MATH201": "B"},
-                {"student id": "076/23", "COMP201": "C", "COMP202": "B+", "COMP203": "A+", "MATH201": "C+"},
-                {"student id": "110/23", "COMP201": "C+", "COMP202": "C+", "COMP203": "A+", "MATH201": "A"},
-                {"student id": "113/23", "COMP201": "B", "COMP202": "C", "COMP203": "B+", "MATH201": "B+"},
-                {"student id": "115/23", "COMP201": "B+", "COMP202": "A", "COMP203": "A", "MATH201": "D"}
-            ],
-            "Year 2-Sem II": [
-                {"student id": "011/23", "COMP204": "A+", "COMP205": "C", "COMP206": "A"},
-                {"student id": "070/23", "COMP204": "A+", "COMP205": "A", "COMP206": "A+"},
-                {"student id": "073/23", "COMP204": "A", "COMP205": "B", "COMP206": "D"},
-                {"student id": "076/23", "COMP204": "A", "COMP205": "D", "COMP206": "D"},
-                {"student id": "110/23", "COMP204": "A+", "COMP205": "B", "COMP206": "B"},
-                {"student id": "113/23", "COMP204": "C", "COMP205": "A+", "COMP206": "C+"},
-                {"student id": "115/23", "COMP204": "A", "COMP205": "B", "COMP206": "C"}
-            ],
-            "Year 2-Sem III": [
-                {"student id": "011/23", "COMP207": "B", "COMP208": "C", "COMP209": "C"},
-                {"student id": "070/23", "COMP207": "B+", "COMP208": "B", "COMP209": "C+"},
-                {"student id": "073/23", "COMP207": "C+", "COMP208": "A+", "COMP209": "D"},
-                {"student id": "076/23", "COMP207": "C", "COMP208": "A+", "COMP209": "A"},
-                {"student id": "110/23", "COMP207": "B", "COMP208": "A", "COMP209": "A"},
-                {"student id": "113/23", "COMP207": "B", "COMP208": "D", "COMP209": "A"},
-                {"student id": "115/23", "COMP207": "C", "COMP208": "C", "COMP209": "C"}
-            ],
-            "Year 3-Sem I": [
-                {"student id": "011/23", "COMP301": "C", "COMP302": "B", "COMP303": "A"},
-                {"student id": "070/23", "COMP301": "C+", "COMP302": "B", "COMP303": "C+"},
-                {"student id": "073/23", "COMP301": "B", "COMP302": "A", "COMP303": "B"},
-                {"student id": "076/23", "COMP301": "D", "COMP302": "A+", "COMP303": "B"},
-                {"student id": "110/23", "COMP301": "B", "COMP302": "C", "COMP303": "A"},
-                {"student id": "113/23", "COMP301": "A", "COMP302": "A+", "COMP303": "C"},
-                {"student id": "115/23", "COMP301": "B+", "COMP302": "B+", "COMP303": "A+"}
-            ],
-            "Year 3-Sem II": [
-                {"student id": "011/23", "COMP304": "C", "COMP305": "A+", "COMP306": "B+", "COMP307": "A"},
-                {"student id": "070/23", "COMP304": "C+", "COMP305": "C+", "COMP306": "B", "COMP307": "C+"},
-                {"student id": "073/23", "COMP304": "B+", "COMP305": "D", "COMP306": "C+", "COMP307": "B+"},
-                {"student id": "076/23", "COMP304": "C+", "COMP305": "B", "COMP306": "A", "COMP307": "B+"},
-                {"student id": "110/23", "COMP304": "D", "COMP305": "B", "COMP306": "C", "COMP307": "C"},
-                {"student id": "113/23", "COMP304": "B", "COMP305": "B", "COMP306": "A", "COMP307": "A"},
-                {"student id": "115/23", "COMP304": "A+", "COMP305": "C+", "COMP306": "B", "COMP307": "B+"}
-            ]
-        };
+        const gradeData = {}; /* populated from Firebase on load */
 
         const academicYears = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"];
         const semesters = ["Sem I", "Sem II", "Sem III"];
@@ -2831,17 +2745,22 @@
             }
         }
         async function changePassword() {
-            const p1 = document.getElementById('newPassword1').value.trim();
-            const p2 = document.getElementById('newPassword2').value.trim();
+            const old = document.getElementById('oldPassword0').value.trim();
+            const p1  = document.getElementById('newPassword1').value.trim();
+            const p2  = document.getElementById('newPassword2').value.trim();
             const msg = document.getElementById('pwChangeMsg');
-            if (!p1) { msg.style.color='#cc0000'; msg.textContent = '❌ Password cannot be empty.'; return; }
-            if (p1.length < 6) { msg.style.color='#cc0000'; msg.textContent = '❌ Password must be at least 6 characters.'; return; }
-            if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent = '❌ Passwords do not match.'; return; }
+            if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+            const oldHash = await sha256(old);
+            if (oldHash !== window.ADMIN_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
+            if (!p1) { msg.style.color='#cc0000'; msg.textContent='❌ Password cannot be empty.'; return; }
+            if (p1.length < 6) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 6 characters.'; return; }
+            if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
             window.ADMIN_PASSWORD = await sha256(p1);
             fbSavePasswords(); /* auto-save hashed password to cloud */
             auditLog('Password Changed', 'Admin password was updated');
             msg.style.color = '#4caf50';
             msg.textContent = '✅ Password updated successfully!';
+            document.getElementById('oldPassword0').value = '';
             document.getElementById('newPassword1').value = '';
             document.getElementById('newPassword2').value = '';
         }
@@ -3217,7 +3136,7 @@
                 <div style="font-size:1.5rem; margin-bottom:8px;">🎓</div>
                 <p style="color:#81c784; font-weight:bold; font-size:0.9rem; margin:0 0 4px;">Student Access</p>
                 <p style="color:#aaa; font-size:0.78rem; margin:0 0 14px;">Enter your Student ID to view your record.</p>
-                <input type="text" id="roleUserIdInput" placeholder="e.g. 070/23"
+                <input type="text" id="roleUserIdInput" placeholder="Enter your Student ID"
                     style="width:100%; padding:10px; border-radius:8px; border:2px solid #4caf50; background:#111; color:#fff; font-size:1rem; box-sizing:border-box; text-align:center; outline:none;"
                     onkeydown="if(event.key==='Enter') roleUserSubmit()">
                 <div id="roleUserError" style="color:#cc0000; font-size:0.8rem; margin-top:8px; min-height:18px;"></div>
@@ -3281,7 +3200,7 @@
                 <div style="font-size:1.5rem; margin-bottom:8px;">🎓</div>
                 <p style="color:#81c784; font-weight:bold; font-size:0.9rem; margin:0 0 4px;">Student Access</p>
                 <p style="color:#aaa; font-size:0.78rem; margin:0 0 14px;">Enter your Student ID to view your record.</p>
-                <input type="text" id="slUserIdInput" placeholder="e.g. 070/23"
+                <input type="text" id="slUserIdInput" placeholder="Enter your Student ID"
                     style="width:100%; padding:10px; border-radius:8px; border:2px solid #4caf50; background:#111; color:#fff; font-size:1rem; box-sizing:border-box; text-align:center; outline:none;"
                     onkeydown="if(event.key==='Enter') slUserSubmit()">
                 <div id="slUserError" style="color:#cc0000; font-size:0.8rem; margin-top:8px; min-height:18px;"></div>
@@ -3355,6 +3274,9 @@
                 <!-- ── Admin Password Tab ── -->
                 <div id="sqlPwTab" style="display:none; margin-top:16px; background:#1a1200; border:1.5px solid #ffd700; border-radius:10px; padding:20px 22px;">
                     <h3 style="color:#ffd700; margin:0 0 14px; font-size:0.95rem; letter-spacing:1px;">🔑 Change Admin Password</h3>
+                    <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">Current Password</label>
+                    <input type="password" id="sqlAdminPwOld" placeholder="Enter current admin password"
+                        style="width:100%; max-width:340px; padding:9px 12px; border-radius:7px; border:1.5px solid #ffd700; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; display:block; margin-bottom:12px;">
                     <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">New Password</label>
                     <input type="password" id="sqlAdminPw1" placeholder="Enter new admin password"
                         style="width:100%; max-width:340px; padding:9px 12px; border-radius:7px; border:1.5px solid #ffd700; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; display:block; margin-bottom:12px;">
@@ -3369,6 +3291,9 @@
                     <div style="margin-top:22px; padding-top:18px; border-top:1px solid #3a2c00;">
                         <h3 style="color:#00e5e5; margin:0 0 8px; font-size:0.95rem; letter-spacing:1px;">🌐 University Server Access Password</h3>
                         <p style="color:#555; font-size:0.78rem; margin:0 0 12px;">This is a separate password used only to authorise connections to the University Server panel.</p>
+                        <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">Current Server Access Password</label>
+                        <input type="password" id="sqlSrvPwOld" placeholder="Enter current server access password"
+                            style="width:100%; max-width:340px; padding:9px 12px; border-radius:7px; border:1.5px solid #00e5e5; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; display:block; margin-bottom:12px;">
                         <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">New Server Access Password</label>
                         <input type="password" id="sqlSrvPw1" placeholder="Enter new server access password"
                             style="width:100%; max-width:340px; padding:9px 12px; border-radius:7px; border:1.5px solid #00e5e5; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; display:block; margin-bottom:12px;">
@@ -3656,7 +3581,7 @@ This is the first paragraph..."
                         <!-- Pass mark row -->
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; background:#0a1a0a; border-radius:8px; padding:10px 12px;">
                             <span style="color:#aaa; font-size:0.82rem; flex:1;">Entrance exam pass mark for this level:</span>
-                            <input type="number" id="permPassMarkInput" placeholder="e.g. 350" min="0" max="700" value="350"
+                            <input type="number" id="permPassMarkInput" placeholder="Enter pass mark" min="0" max="700" value="350"
                                 style="width:80px; padding:6px; border-radius:6px; border:1px solid #555; background:#111; color:#fff; font-size:0.9rem; text-align:center;">
                             <span style="color:#555; font-size:0.78rem;">/700</span>
                         </div>
@@ -3719,11 +3644,11 @@ This is the first paragraph..."
                     <!-- Personal Info -->
                     <div style="color:#00a2ff; font-size:0.75rem; font-weight:bold; margin-top:4px; margin-bottom:2px; text-transform:uppercase; letter-spacing:1px;">Personal Information</div>
                     <label>Full Name *</label>
-                    <input type="text" id="reg_name" placeholder="e.g. Ayana Dufera">
+                    <input type="text" id="reg_name" placeholder="Enter your full name">
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;">
                             <label>Age *</label>
-                            <input type="number" id="reg_age" placeholder="e.g. 20" min="16" max="60" style="width:100%;">
+                            <input type="number" id="reg_age" placeholder="Enter your age" min="16" max="60" style="width:100%;">
                         </div>
                         <div style="flex:1;">
                             <label>Sex *</label>
@@ -3846,7 +3771,7 @@ This is the first paragraph..."
                     <div style="color:#00a2ff; font-size:0.75rem; font-weight:bold; margin-top:4px; margin-bottom:2px; text-transform:uppercase; letter-spacing:1px;">Student Identification</div>
                     <label>Student ID *</label>
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <input type="text" id="oldReg_id" placeholder="e.g. 070/23" oninput="oldRegAutoFill()" style="flex:1;">
+                        <input type="text" id="oldReg_id" placeholder="Enter your Student ID" oninput="oldRegAutoFill()" style="flex:1;">
                         <button class="btn-feat" style="flex:none; padding:8px 14px; font-size:0.78rem;" onclick="oldRegAutoFill()">🔍 Load</button>
                     </div>
                     <div id="oldRegIdStatus" style="font-size:0.76rem; min-height:16px; margin-top:4px; color:#555;"></div>
@@ -4180,29 +4105,39 @@ This is the first paragraph..."
         }
 
         async function sqlAdminPwUpdate() {
+            const old = document.getElementById('sqlAdminPwOld').value.trim();
             const p1 = document.getElementById('sqlAdminPw1').value.trim();
             const p2 = document.getElementById('sqlAdminPw2').value.trim();
             const msg = document.getElementById('sqlAdminPwMsg');
+            if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+            const oldHash = await sha256(old);
+            if (oldHash !== window.ADMIN_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
             if (!p1 || p1.length < 4) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 4 characters.'; return; }
             if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
             window.ADMIN_PASSWORD = await sha256(p1);
             await fbSavePasswords();
             if (typeof auditLog === 'function') auditLog('Password Changed', 'Admin password was updated via Database tab');
             msg.style.color='#4caf50'; msg.textContent='✅ Admin password updated and saved to database successfully.';
+            document.getElementById('sqlAdminPwOld').value = '';
             document.getElementById('sqlAdminPw1').value = '';
             document.getElementById('sqlAdminPw2').value = '';
         }
 
         async function sqlServerPwUpdate() {
+            const old = document.getElementById('sqlSrvPwOld').value.trim();
             const p1 = document.getElementById('sqlSrvPw1').value.trim();
             const p2 = document.getElementById('sqlSrvPw2').value.trim();
             const msg = document.getElementById('sqlSrvPwMsg');
+            if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current server access password.'; return; }
+            const oldHash = await sha256(old);
+            if (oldHash !== window.SERVER_ACCESS_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
             if (!p1 || p1.length < 4) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 4 characters.'; return; }
             if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
             window.SERVER_ACCESS_PASSWORD = await sha256(p1);
             await fbSavePasswords();
             if (typeof auditLog === 'function') auditLog('Password Changed', 'University Server access password was updated');
             msg.style.color='#4caf50'; msg.textContent='✅ University Server access password updated successfully.';
+            document.getElementById('sqlSrvPwOld').value = '';
             document.getElementById('sqlSrvPw1').value = '';
             document.getElementById('sqlSrvPw2').value = '';
         }
@@ -4616,10 +4551,18 @@ This is the first paragraph..."
 
                 let data, title, color;
                 if (tbl === 'students') {
-                    data = studentListData.filter(r => allowedIds.has(r["student id"]));
-                    /* Apply year and semester filter if selected (matches against stored year/semester fields) */
-                    if (fYear) data = data.filter(r => (r.year || '') === fYear);
-                    if (fSem)  data = data.filter(r => (r.semester || '') === fSem);
+                    const priority = ['student id','full name','year','semester','level','classification','department'];
+                    let raw = studentListData.filter(r => allowedIds.has(r["student id"]));
+                    if (fYear) raw = raw.filter(r => (r.year || '') === fYear);
+                    if (fSem)  raw = raw.filter(r => (r.semester || '') === fSem);
+                    /* Reorder columns explicitly so Object.keys() gives the right order */
+                    data = raw.map(r => {
+                        const ordered = {};
+                        const lower = Object.fromEntries(Object.entries(r).map(([k,v]) => [k.toLowerCase(), {key:k,val:v}]));
+                        priority.forEach(p => { if (lower[p]) ordered[lower[p].key] = lower[p].val; });
+                        Object.entries(r).forEach(([k,v]) => { if (!priority.includes(k.toLowerCase())) ordered[k] = v; });
+                        return ordered;
+                    });
                     title = 'students'; color = '#4caf50';
                 } else if (tbl === 'grades') {
                     const flat = [];
@@ -4630,8 +4573,12 @@ This is the first paragraph..."
                         const rowSem  = dashIdx >= 0 ? key.slice(dashIdx + 1).trim() : '';
                         if (fYear && rowYear !== fYear) return;
                         if (fSem  && rowSem  !== fSem)  return;
-                        /* Spread r first so student id stays col-1; semester added after */
-                        rows.forEach(r => flat.push({ ...r, semester: key }));
+                        /* Build ordered row: student id first, then courses, semester last */
+                        rows.forEach(r => {
+                            const sid = r['student id'] || r['Student ID'] || r['Student Id'] || '';
+                            const courses = Object.fromEntries(Object.entries(r).filter(([k]) => k.toLowerCase() !== 'student id'));
+                            flat.push({ 'student id': sid, ...courses, semester: key });
+                        });
                     });
                     data = flat.filter(r => allowedIds.has(r["student id"]));
                     title = 'grade_data'; color = '#00a2ff';
@@ -4643,8 +4590,12 @@ This is the first paragraph..."
                         const rowSem  = dashIdx >= 0 ? key.slice(dashIdx + 1).trim() : '';
                         if (fYear && rowYear !== fYear) return;
                         if (fSem  && rowSem  !== fSem)  return;
-                        /* Spread r first so student id stays col-1; semester added after */
-                        rows.forEach(r => flat.push({ ...r, semester: key }));
+                        /* Build ordered row: student id first, then courses, semester last */
+                        rows.forEach(r => {
+                            const sid = r['student id'] || r['Student ID'] || r['Student Id'] || '';
+                            const courses = Object.fromEntries(Object.entries(r).filter(([k]) => k.toLowerCase() !== 'student id'));
+                            flat.push({ 'student id': sid, ...courses, semester: key });
+                        });
                     });
                     data = flat.filter(r => allowedIds.has(r["student id"]));
                     title = 'course_scores'; color = '#ffae00';
@@ -4682,13 +4633,124 @@ This is the first paragraph..."
                 return;
             }
 
-            /* ── Case 3: Credits — no filter needed ── */
-            let data, title, color;
+            /* ── Case 3: Credits — grouped by Year → Semester ── */
             if (tbl === 'credits') {
-                data = Object.entries(courseCredits).map(([course, credits]) => ({ course, credits }));
-                title = 'course_credits'; color = '#ce93d8';
+                /* Curriculum map: course → { year, semester } */
+                const curriculumMap = {
+                    /* Year 1 - Sem I */
+                    "com.english":          { year:'Year 1', sem:'Sem I' },
+                    "maths":                { year:'Year 1', sem:'Sem I' },
+                    "physics":              { year:'Year 1', sem:'Sem I' },
+                    "critical thinking":    { year:'Year 1', sem:'Sem I' },
+                    "physical fitness":     { year:'Year 1', sem:'Sem I' },
+                    "ENGL101":              { year:'Year 1', sem:'Sem I' },
+                    "MATH101":              { year:'Year 1', sem:'Sem I' },
+                    "PHED101":              { year:'Year 1', sem:'Sem I' },
+                    "PHIL101":              { year:'Year 1', sem:'Sem I' },
+                    "PHYS101":              { year:'Year 1', sem:'Sem I' },
+                    /* Year 1 - Sem II */
+                    "Psychology":           { year:'Year 1', sem:'Sem II' },
+                    "geography":            { year:'Year 1', sem:'Sem II' },
+                    "history":              { year:'Year 1', sem:'Sem II' },
+                    "applied maths I":      { year:'Year 1', sem:'Sem II' },
+                    "GEOG102":              { year:'Year 1', sem:'Sem II' },
+                    "HIST102":              { year:'Year 1', sem:'Sem II' },
+                    "MATH102":              { year:'Year 1', sem:'Sem II' },
+                    "PSYC102":              { year:'Year 1', sem:'Sem II' },
+                    /* Year 1 - Sem III */
+                    "Intro. programing":    { year:'Year 1', sem:'Sem III' },
+                    "applied maths II":     { year:'Year 1', sem:'Sem III' },
+                    "COMP103":              { year:'Year 1', sem:'Sem III' },
+                    "MATH103":              { year:'Year 1', sem:'Sem III' },
+                    /* Year 2 - Sem I */
+                    "Advanced DB":          { year:'Year 2', sem:'Sem I' },
+                    "Numerical analysis":   { year:'Year 2', sem:'Sem I' },
+                    "DS and algorithm":     { year:'Year 2', sem:'Sem I' },
+                    "CO and architecture":  { year:'Year 2', sem:'Sem I' },
+                    "COMP201":              { year:'Year 2', sem:'Sem I' },
+                    "COMP202":              { year:'Year 2', sem:'Sem I' },
+                    "COMP203":              { year:'Year 2', sem:'Sem I' },
+                    "MATH201":              { year:'Year 2', sem:'Sem I' },
+                    /* Year 2 - Sem II */
+                    "OOP":                  { year:'Year 2', sem:'Sem II' },
+                    "OS":                   { year:'Year 2', sem:'Sem II' },
+                    "A&C Theory":           { year:'Year 2', sem:'Sem II' },
+                    "COMP204":              { year:'Year 2', sem:'Sem II' },
+                    "COMP205":              { year:'Year 2', sem:'Sem II' },
+                    "COMP206":              { year:'Year 2', sem:'Sem II' },
+                    /* Year 2 - Sem III */
+                    "wireless com.& mobile":{ year:'Year 2', sem:'Sem III' },
+                    "SE":                   { year:'Year 2', sem:'Sem III' },
+                    "Microp & assembly":    { year:'Year 2', sem:'Sem III' },
+                    "wireless com.":        { year:'Year 2', sem:'Sem III' },
+                    "Microp.":              { year:'Year 2', sem:'Sem III' },
+                    "COMP207":              { year:'Year 2', sem:'Sem III' },
+                    "COMP208":              { year:'Year 2', sem:'Sem III' },
+                    "COMP209":              { year:'Year 2', sem:'Sem III' },
+                    /* Year 3 - Sem I */
+                    "Advanced. JP":         { year:'Year 3', sem:'Sem I' },
+                    "Design Algorithm":     { year:'Year 3', sem:'Sem I' },
+                    "programming":          { year:'Year 3', sem:'Sem I' },
+                    "COMP301":              { year:'Year 3', sem:'Sem I' },
+                    "COMP302":              { year:'Year 3', sem:'Sem I' },
+                    "COMP303":              { year:'Year 3', sem:'Sem I' },
+                    /* Year 3 - Sem II */
+                    "intro.AI":             { year:'Year 3', sem:'Sem II' },
+                    "networking":           { year:'Year 3', sem:'Sem II' },
+                    "research":             { year:'Year 3', sem:'Sem II' },
+                    "complier design":      { year:'Year 3', sem:'Sem II' },
+                    "COMP304":              { year:'Year 3', sem:'Sem II' },
+                    "COMP305":              { year:'Year 3', sem:'Sem II' },
+                    "COMP306":              { year:'Year 3', sem:'Sem II' },
+                    "COMP307":              { year:'Year 3', sem:'Sem II' },
+                };
+                const yearOrder = ['Year 1','Year 2','Year 3','Year 4','Year 5'];
+                const semOrder  = ['Sem I','Sem II','Sem III'];
+
+                /* Group courses */
+                const grouped = {};
+                Object.entries(courseCredits).forEach(([course, cred]) => {
+                    const loc = curriculumMap[course] || { year:'Other', sem:'Other' };
+                    const key = loc.year + ' › ' + loc.sem;
+                    if (!grouped[key]) grouped[key] = { year: loc.year, sem: loc.sem, rows: [] };
+                    grouped[key].rows.push({ course, credits: cred });
+                });
+
+                /* Sort groups */
+                const sortedKeys = Object.keys(grouped).sort((a, b) => {
+                    const ga = grouped[a], gb = grouped[b];
+                    const yi = yearOrder.indexOf(ga.year) - yearOrder.indexOf(gb.year);
+                    if (yi !== 0) return yi;
+                    return semOrder.indexOf(ga.sem) - semOrder.indexOf(gb.sem);
+                });
+
+                let totalCr = 0;
+                sortedKeys.forEach(key => {
+                    const { year, sem, rows } = grouped[key];
+                    const semCr = rows.reduce((s,r) => s + r.credits, 0);
+                    totalCr += semCr;
+                    let tbl2 = `<div style="padding:6px;"><table class="sql-table" style="margin-bottom:0;"><thead><tr>
+                        <th style="font-size:0.72rem;padding:5px 7px;">COURSE</th>
+                        <th style="font-size:0.72rem;padding:5px 7px;text-align:center;">CREDITS</th>
+                    </tr></thead><tbody>`;
+                    rows.forEach(r => {
+                        tbl2 += `<tr><td style="font-size:0.72rem;padding:4px 7px;">${r.course}</td>
+                                     <td style="font-size:0.72rem;padding:4px 7px;text-align:center;color:#ffd700;font-weight:bold;">${r.credits}</td></tr>`;
+                    });
+                    tbl2 += `<tr><td style="font-size:0.72rem;padding:4px 7px;color:#aaa;font-style:italic;">Semester Total</td>
+                                 <td style="font-size:0.72rem;padding:4px 7px;text-align:center;color:#4caf50;font-weight:bold;">${semCr}</td></tr>`;
+                    tbl2 += `</tbody></table></div>`;
+                    let semColor = sem === 'Sem I' ? '#00a2ff' : sem === 'Sem II' ? '#81c784' : '#ffae00';
+                    html += groupBlock(`📅 ${year} › ${sem}`, semColor, rows.length, tbl2);
+                });
+
+                html += `<div style="margin-top:10px;padding:10px 14px;background:#1a1a00;border:1px solid #ffd700;border-radius:8px;color:#ffd700;font-weight:bold;font-size:0.85rem;">
+                    🎓 Total Credits: ${totalCr}</div>`;
+                html += `<button onclick="printSection('Course Credits', document.getElementById('sqlTableArea').innerHTML.replace(/<button[^>]*>[\\s\\S]*?<\\/button>/g,''))" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:#ce93d8; border:1px solid #ce93d8; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print Credits</button>`;
+                area.innerHTML = html;
+                stats.textContent = `${Object.keys(courseCredits).length} course(s) · ${totalCr} total credits · ${new Date().toLocaleTimeString()}`;
+                return;
             }
-            sqlRenderTable(area, stats, data, title, color, '');
         }
 
         function sqlRenderTable(area, stats, data, title, color, filterNote) {
@@ -4705,7 +4767,11 @@ This is the first paragraph..."
             }
 
             const tbl  = window._sqlActiveTbl || '';
-            const cols = Object.keys(data[0]);
+            const rawCols = Object.keys(data[0]);
+            /* Apply column ordering right away for student/reg tables */
+            const cols = (tbl === 'students' || tbl === 'reg_diploma' || tbl === 'reg_degree' || tbl === 'reg_masters' || tbl === 'reg_phd')
+                ? studentColOrder(rawCols)
+                : rawCols;
 
             /* Helper: render a flat mini-table for a subset of rows */
             function miniTable(rows, miniCols) {
@@ -4761,11 +4827,11 @@ This is the first paragraph..."
                     yrMap.get(sem).push(row);
                 });
 
-                /* Render nested groups — student id first, then full name, year, sem, etc. */
+                /* Render nested groups — cols already ordered via studentColOrder above */
                 const isStudentTbl = (tbl === 'students');
                 const displayCols = isStudentTbl
-                    ? studentColOrder(cols)
-                    : cols.filter(c => !['classification','level','year','semester'].includes(c));
+                    ? cols
+                    : cols.filter(c => !['classification','level','year','semester'].includes(c.toLowerCase()));
 
                 map.forEach((clsMap, cls) => {
                     let clsInner = '';
@@ -4792,16 +4858,16 @@ This is the first paragraph..."
                     html += groupBlock(`📋 ${cls}`, '#ffd700', clsTotal, '<div style="padding:6px;">' + clsInner + '</div>');
                 });
 
-            /* ── Grouped view: grades / scores — group by Year → Semester ── */
-            } else if (tbl === 'grades' || tbl === 'scores') {
+            /* ── Grouped view: grades / scores — group by semester key ── */
+            } else if (tbl === 'grades' || tbl === 'scores' || tbl === 'grade_data' || tbl === 'course_scores') {
                 const semMap = new Map();
                 data.forEach(row => {
                     const key = row.semester || '—';
                     if (!semMap.has(key)) semMap.set(key, []);
                     semMap.get(key).push(row);
                 });
-                const rawCols = cols.filter(c => c !== 'semester');
-                const displayCols = gradeColOrder(rawCols);
+                /* semester is already the last col — display all cols except semester in header, show semester as group label */
+                const displayCols = Object.keys(data[0] || {}).filter(c => c !== 'semester');
                 semMap.forEach((rows, sem) => {
                     html += groupBlock(`📅 ${sem}`, '#00a2ff', rows.length,
                         '<div style="padding:6px;">' + miniTable(rows, displayCols.length ? displayCols : cols) + '</div>'
@@ -4823,6 +4889,12 @@ This is the first paragraph..."
 
             area.innerHTML = html;
             stats.textContent = `${data.length} row(s) · ${cols.length} col(s) · ${new Date().toLocaleTimeString()}`;
+            /* ── Print button ── */
+            const printBtn = document.createElement('button');
+            printBtn.textContent = '🖨️ Print This Table';
+            printBtn.style.cssText = 'margin-top:12px; padding:7px 18px; background:#1a3a5c; color:#00a2ff; border:1px solid #00a2ff; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;';
+            printBtn.onclick = () => printSection('Database Table: ' + title, area.innerHTML.replace(/<button[^>]*>.*?<\/button>/gs, ''));
+            area.appendChild(printBtn);
         }
 
         function sqlExportAll() {
@@ -6115,7 +6187,6 @@ This is the first paragraph..."
         ══════════════════════════════════════════════════ */
         let deptGradePermissions   = new Set();   /* depts allowed to upload grades */
         let pendingGradeSubmissions = [];          /* teacher → dept → registrar pipeline */
-        /* TEACHER_PASSWORD stored in window.TEACHER_PASSWORD; default: Teacher@HMI2026 */
         let currentTeacher          = null;        /* { dept } when logged in */
         let registrarLoggedIn       = false;
 
@@ -6273,6 +6344,7 @@ This is the first paragraph..."
                 </tr>`;
             });
             html += '</tbody></table></div>';
+            html += `<button onclick="printSection('Registrar Grade Audit Log', this.previousElementSibling.outerHTML)" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:#ce93d8; border:1px solid #ce93d8; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print</button>`;
             area.innerHTML = html;
         }
 
@@ -6281,6 +6353,9 @@ This is the first paragraph..."
             <div style="max-width:380px; margin:0 auto;">
                 <h3 style="color:#ce93d8; margin-top:0;">🔑 Change Registrar Password</h3>
                 <p style="color:#aaa; font-size:0.8rem; margin-bottom:14px;">Update your Registrar's Office login password.</p>
+                <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">Current Password</label>
+                <input type="password" id="regPwOld" placeholder="Enter current password"
+                    style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #ce93d8; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
                 <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">New Password</label>
                 <input type="password" id="regPwNew1" placeholder="New password (min 6 chars)"
                     style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #ce93d8; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
@@ -6292,15 +6367,20 @@ This is the first paragraph..."
             </div>`;
         }
         async function regUpdatePw() {
-            const p1 = document.getElementById('regPwNew1').value.trim();
-            const p2 = document.getElementById('regPwNew2').value.trim();
+            const old = document.getElementById('regPwOld').value.trim();
+            const p1  = document.getElementById('regPwNew1').value.trim();
+            const p2  = document.getElementById('regPwNew2').value.trim();
             const msg = document.getElementById('regPwMsg');
+            if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+            const oldHash = await sha256(old);
+            if (oldHash !== window.REGISTRAR_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
             if (!p1 || p1.length < 6) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 6 characters.'; return; }
             if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
             window.REGISTRAR_PASSWORD = await sha256(p1);
             fbSavePasswords(); /* auto-save hashed password to cloud */
             auditLog('Password Changed', 'Registrar password was updated');
             msg.style.color='#4caf50'; msg.textContent='✅ Registrar password updated.';
+            document.getElementById('regPwOld').value = '';
             document.getElementById('regPwNew1').value = '';
             document.getElementById('regPwNew2').value = '';
         }
@@ -6310,10 +6390,9 @@ This is the first paragraph..."
             <div style="max-width:420px; margin:0 auto;">
                 <h3 style="color:#81c784; margin-top:0;">👩‍🏫 Change Teacher Password</h3>
                 <p style="color:#aaa; font-size:0.8rem; margin-bottom:6px;">Update the shared password used by all teachers to access the Grade Upload panel.</p>
-                <div style="background:#0d2a0d; border:1px solid #2e4d2e; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:0.78rem; color:#81c784;">
-                    🔑 Default password: <strong>Teacher@HMI2026</strong>
-                    <span style="color:#555; display:block; margin-top:2px;">Change this after first login for security.</span>
-                </div>
+                <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">Current Teacher Password</label>
+                <input type="password" id="regTeacherPwOld" placeholder="Enter current password"
+                    style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #81c784; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
                 <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">New Teacher Password</label>
                 <input type="password" id="regTeacherPwNew1" placeholder="New password (min 6 chars)"
                     style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #81c784; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
@@ -6326,15 +6405,20 @@ This is the first paragraph..."
         }
 
         async function regUpdateTeacherPw() {
-            const p1 = document.getElementById('regTeacherPwNew1').value.trim();
-            const p2 = document.getElementById('regTeacherPwNew2').value.trim();
+            const old = document.getElementById('regTeacherPwOld').value.trim();
+            const p1  = document.getElementById('regTeacherPwNew1').value.trim();
+            const p2  = document.getElementById('regTeacherPwNew2').value.trim();
             const msg = document.getElementById('regTeacherPwMsg');
+            if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter the current teacher password.'; return; }
+            const oldHash = await sha256(old);
+            if (oldHash !== window.TEACHER_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
             if (!p1 || p1.length < 6) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 6 characters.'; return; }
             if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
             window.TEACHER_PASSWORD = await sha256(p1);
             fbSavePasswords(); /* auto-save hashed password to cloud */
             auditLog('Password Changed', 'Teacher password was updated by Registrar');
             msg.style.color='#4caf50'; msg.textContent='✅ Teacher password updated successfully.';
+            document.getElementById('regTeacherPwOld').value = '';
             document.getElementById('regTeacherPwNew1').value = '';
             document.getElementById('regTeacherPwNew2').value = '';
         }
@@ -6804,6 +6888,9 @@ This is the first paragraph..."
                         <div style="max-width:380px; margin:0 auto; background:#0a1a1a; border:1px solid #00e5e5; border-radius:10px; padding:18px;">
                             <h3 style="color:#00e5e5; margin-top:0;">🔑 Change Cashier Password</h3>
                             <p style="color:#aaa; font-size:0.8rem; margin-bottom:14px;">Update your cashier login password. Only you can change this.</p>
+                            <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">Current Password</label>
+                            <input type="password" id="cashierPwOld" placeholder="Enter current password"
+                                style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #00e5e5; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
                             <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">New Password</label>
                             <input type="password" id="cashierPwNew1" placeholder="New password (min 4 chars)"
                                 style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #00e5e5; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
@@ -6825,7 +6912,7 @@ This is the first paragraph..."
                         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
                             <div style="flex:2; min-width:140px;">
                                 <label style="color:#aaa; font-size:0.73rem; display:block; margin-bottom:3px;">Full Name (exactly as on documents) *</label>
-                                <input type="text" id="newStudPayName" placeholder="e.g. Abebe Kebede"
+                                <input type="text" id="newStudPayName" placeholder="Enter student full name"
                                     style="width:100%; padding:8px; border-radius:6px; border:1px solid #6a1a9a; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none;">
                             </div>
                             <div style="flex:1; min-width:110px;">
@@ -6877,7 +6964,7 @@ This is the first paragraph..."
                     <div style="background:#0a1800; border:1px solid #2e4d00; border-radius:10px; padding:16px; margin-bottom:16px;">
                         <div style="color:#81c784; font-weight:bold; font-size:0.85rem; margin-bottom:10px;">🔍 Look Up Existing Student</div>
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <input type="text" id="cashierStudentId" placeholder="Enter Student ID (e.g. 070/23)"
+                            <input type="text" id="cashierStudentId" placeholder="Enter your Student ID"
                                 style="flex:1; min-width:160px; padding:9px; border-radius:8px; border:2px solid #4caf50; background:#111; color:#fff; font-size:0.95rem; outline:none;"
                                 onkeydown="if(event.key==='Enter') cashierLookup()">
                             <button class="btn-feat btn-feat-green" onclick="cashierLookup()" style="padding:9px 20px; flex:none;">🔍 Search</button>
@@ -6935,12 +7022,12 @@ This is the first paragraph..."
                                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                     <div style="flex:1; min-width:140px;">
                                         <label style="color:#aaa; font-size:0.75rem; display:block; margin-bottom:3px;">Transaction / Reference No.</label>
-                                        <input type="text" id="payTxRef" placeholder="e.g. TXN-2024-XXXXXX"
+                                        <input type="text" id="payTxRef" placeholder="Enter transaction reference"
                                             style="width:100%; padding:7px; border-radius:6px; border:1.5px solid #00a2ff; background:#111; color:#fff; font-size:0.83rem; box-sizing:border-box; outline:none;">
                                     </div>
                                     <div style="flex:1; min-width:120px;">
                                         <label style="color:#aaa; font-size:0.75rem; display:block; margin-bottom:3px;">Sender Account / Phone</label>
-                                        <input type="text" id="paySender" placeholder="e.g. 09XXXXXXXX"
+                                        <input type="text" id="paySender" placeholder="Enter phone number"
                                             style="width:100%; padding:7px; border-radius:6px; border:1.5px solid #00a2ff; background:#111; color:#fff; font-size:0.83rem; box-sizing:border-box; outline:none;">
                                     </div>
                                 </div>
@@ -6948,7 +7035,7 @@ This is the first paragraph..."
                             </div>
                             <div style="margin-bottom:10px;">
                                 <label style="color:#aaa; font-size:0.76rem; display:block; margin-bottom:4px;">Reference / Note</label>
-                                <input type="text" id="payNote" placeholder="e.g. Sem I tuition, receipt #1234"
+                                <input type="text" id="payNote" placeholder="Enter payment note"
                                     style="width:100%; padding:8px; border-radius:6px; border:1px solid #555; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none;">
                             </div>
                             <div id="payError" style="color:#cc0000; font-size:0.8rem; margin-bottom:8px; min-height:16px;"></div>
@@ -6990,7 +7077,7 @@ This is the first paragraph..."
             <div id="sfStep1">
                 <div class="reg-form">
                     <label>Student ID *</label>
-                    <input type="text" id="sfStudentId" placeholder="e.g. 070/23" oninput="sfClearError()">
+                    <input type="text" id="sfStudentId" placeholder="Enter your Student ID" oninput="sfClearError()">
 
                     <label>Full Name *</label>
                     <input type="text" id="sfFullName" placeholder="Your full name" oninput="sfClearError()">
@@ -7056,7 +7143,7 @@ This is the first paragraph..."
                         <!-- Telebirr section -->
                         <div id="sfTelebirrSection" style="display:none;">
                             <label>Your Telebirr Phone Number *</label>
-                            <input type="text" id="sfTelebirrPhone" placeholder="e.g. 09XXXXXXXX" style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #444; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
+                            <input type="text" id="sfTelebirrPhone" placeholder="Enter phone number" style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #444; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
                         </div>
                         <!-- University CBE info (always shown for digital) -->
                         <div style="background:#001a00; border:1px solid #2e7d32; border-radius:8px; padding:12px; margin-bottom:10px;">
@@ -7074,12 +7161,12 @@ This is the first paragraph..."
                             </div>
                         </div>
                         <label>Transaction Reference Number *</label>
-                        <input type="text" id="sfTxRef" placeholder="e.g. TX-2024-0001234 (from your bank receipt)" style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #00a2ff; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:6px;">
+                        <input type="text" id="sfTxRef" placeholder="Enter bank transaction reference" style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #00a2ff; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:6px;">
                         <div style="color:#555; font-size:0.72rem;">Enter the transaction ID/reference from your bank or Telebirr SMS confirmation.</div>
                     </div>
 
                     <label>Reference / Note (optional)</label>
-                    <input type="text" id="sfNote" placeholder="e.g. Receipt #1234, bank ref...">
+                    <input type="text" id="sfNote" placeholder="Enter note or reference">
                 </div>
 
                 <div id="sfError" style="color:#cc0000; font-size:0.82rem; margin:12px 0 4px; min-height:16px;"></div>
@@ -7455,6 +7542,7 @@ This is the first paragraph..."
         html += `<div class="sql-table-wrap"><table class="sql-table"><thead><tr>${cols.map(c=>`<th>${c.toUpperCase()}</th>`).join('')}</tr></thead><tbody>`;
         myStudents.forEach(r => { html += `<tr>${cols.map(c=>`<td>${r[c]||''}</td>`).join('')}</tr>`; });
         html += '</tbody></table></div>';
+        html += `<button onclick="printSection('Students — ${dept}', this.previousElementSibling.outerHTML)" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:#4caf50; border:1px solid #4caf50; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print Student List</button>`;
         area.innerHTML = html;
     }
     function deptFilterStudents(fYear, fSem) {
@@ -7497,6 +7585,7 @@ This is the first paragraph..."
             filtered.forEach(r => { html += `<tr>${cols.map(c=>`<td>${r[c]||''}</td>`).join('')}</tr>`; });
             html += '</tbody></table></div>';
         });
+        html += `<button onclick="printSection('${label} — ${dept}', document.getElementById('deptHeadContent').innerHTML.replace(/<button[^>]*>[\\s\\S]*?<\\/button>/g,''))" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:${color}; border:1px solid ${color}; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print ${label}</button>`;
         area.innerHTML = html;
     }
     function deptFilterGrades(fYear, fSem) {
@@ -7593,6 +7682,9 @@ This is the first paragraph..."
         <div style="max-width:400px;">
             <h3 style="color:#ffd700; margin-top:0;">🔑 Change Department Head Password</h3>
             <p style="color:#aaa; font-size:0.8rem; margin-bottom:14px;">Set a new password for the <strong style="color:#00e5e5;">${dept}</strong> department head login. You can change this anytime.</p>
+            <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">Current Password</label>
+            <input type="password" id="dhOldPw" placeholder="Enter current password"
+                style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #ffd700; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
             <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">New Password</label>
             <input type="password" id="dhNewPw1" placeholder="New password (min 4 chars)"
                 style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #ffd700; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
@@ -7606,14 +7698,20 @@ This is the first paragraph..."
     }
 
     async function deptHeadChangePw(dept) {
+        const old = document.getElementById('dhOldPw').value.trim();
         const p1  = document.getElementById('dhNewPw1').value.trim();
         const p2  = document.getElementById('dhNewPw2').value.trim();
         const msg = document.getElementById('dhPwMsg');
+        if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+        const oldHash = await sha256(old);
+        const currentHash = window.deptHeadPasswords[dept] || window.DEFAULT_DEPT_PASSWORD;
+        if (oldHash !== currentHash) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
         if (!p1 || p1.length < 4) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 4 characters.'; return; }
         if (p1 !== p2)             { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
         window.deptHeadPasswords[dept] = await sha256(p1);
         fbSavePasswords(); /* auto-save hashed password to cloud */
         msg.style.color='#4caf50'; msg.textContent='✅ Password updated for ' + dept + '.';
+        document.getElementById('dhOldPw').value = '';
         document.getElementById('dhNewPw1').value = '';
         document.getElementById('dhNewPw2').value = '';
     }
@@ -7688,7 +7786,7 @@ This is the first paragraph..."
             <div style="color:#ce93d8; font-weight:bold; font-size:0.85rem; margin-bottom:12px;">📨 Send Message to Registrar</div>
             <div style="margin-bottom:8px;">
                 <label style="color:#aaa; font-size:0.76rem; display:block; margin-bottom:4px;">Subject</label>
-                <input type="text" id="deptMsgSubject" placeholder="e.g. Grade correction request, Student concern..."
+                <input type="text" id="deptMsgSubject" placeholder="Enter subject"
                     style="width:100%; padding:8px; border-radius:6px; border:1px solid #4a148c; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none;">
             </div>
             <div style="margin-bottom:10px;">
@@ -7884,7 +7982,7 @@ This is the first paragraph..."
                 </div>
                 <div style="flex:1; min-width:100px;">
                     <label style="color:#aaa; font-size:0.74rem; display:block; margin-bottom:3px;">Monthly Fee (ETB)</label>
-                    <input type="number" id="fhMatrixRate" placeholder="e.g. 1500" min="0"
+                    <input type="number" id="fhMatrixRate" placeholder="Enter fee rate" min="0"
                         style="width:100%; padding:8px; border-radius:6px; border:1px solid #2e7d32; background:#111; color:#fff; font-size:0.83rem; box-sizing:border-box; outline:none;">
                 </div>
                 <button class="btn-feat btn-feat-green" onclick="fhAddMonthlyRate()" style="padding:8px 16px; flex:none;">+ Add Row</button>
@@ -7902,7 +8000,7 @@ This is the first paragraph..."
         <div style="background:#001a00; border:1px solid #2e7d32; border-radius:10px; padding:16px; margin-bottom:14px;">
             <div style="color:#4caf50; font-weight:bold; font-size:0.85rem; margin-bottom:12px;">➕ Other Fee Types (for cashier dropdown)</div>
             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
-                <input type="text" id="fhFeeNameInput" placeholder="Fee name (e.g. Dorm Fee)"
+                <input type="text" id="fhFeeNameInput" placeholder="Enter fee name"
                     style="flex:2; min-width:160px; padding:8px; border-radius:6px; border:1px solid #2e7d32; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none;">
                 <input type="number" id="fhFeeAmtInput" placeholder="Default amount" min="0"
                     style="flex:1; min-width:100px; padding:8px; border-radius:6px; border:1px solid #2e7d32; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none;">
@@ -8008,6 +8106,7 @@ This is the first paragraph..."
             html += `<tr>${cols.map(c => `<td style="${c==='amount'?'color:#ffd700;font-weight:bold;':''}">${c==='amount'?'ETB '+Number(p[c]).toLocaleString():p[c]||''}</td>`).join('')}</tr>`;
         });
         html += '</tbody></table></div>';
+        html += `<button onclick="printSection('All Payment Transactions', this.previousElementSibling.outerHTML)" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:#00a2ff; border:1px solid #00a2ff; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print Ledger</button>`;
         area.innerHTML = html;
     }
 
@@ -8016,6 +8115,9 @@ This is the first paragraph..."
         <div style="max-width:420px;">
             <h3 style="color:#ffd700; margin-top:0;">🔑 Change Finance Head Password</h3>
             <p style="color:#aaa; font-size:0.8rem; margin-bottom:14px;">Update your Finance Head login password. Only you can change this.</p>
+            <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">Current Password</label>
+            <input type="password" id="fhPwOld" placeholder="Enter current password"
+                style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #ffd700; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
             <label style="color:#aaa; font-size:0.8rem; display:block; margin-bottom:4px;">New Password</label>
             <input type="password" id="fhPwNew1" placeholder="New password (min 6 chars)"
                 style="width:100%; padding:9px; border-radius:7px; border:1.5px solid #ffd700; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; margin-bottom:10px;">
@@ -8030,15 +8132,20 @@ This is the first paragraph..."
     }
 
     async function fhUpdateMyPw() {
-        const p1 = document.getElementById('fhPwNew1').value.trim();
-        const p2 = document.getElementById('fhPwNew2').value.trim();
+        const old = document.getElementById('fhPwOld').value.trim();
+        const p1  = document.getElementById('fhPwNew1').value.trim();
+        const p2  = document.getElementById('fhPwNew2').value.trim();
         const msg = document.getElementById('fhPwMsg2');
+        if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+        const oldHash = await sha256(old);
+        if (oldHash !== window.FINANCE_HEAD_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
         if (!p1 || p1.length < 6) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 6 characters.'; return; }
         if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
         window.FINANCE_HEAD_PASSWORD = await sha256(p1);
         fbSavePasswords(); /* auto-save hashed password to cloud */
         auditLog('Password Changed', 'Finance Head password was updated');
         msg.style.color='#4caf50'; msg.textContent='✅ Finance Head password updated.';
+        document.getElementById('fhPwOld').value = '';
         document.getElementById('fhPwNew1').value = '';
         document.getElementById('fhPwNew2').value = '';
     }
@@ -8052,7 +8159,7 @@ This is the first paragraph..."
             <div style="color:#00e5e5; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">💬 Communication Channel — Finance Head ↔ Cashier</div>
             <p style="color:#aaa; font-size:0.78rem; margin-bottom:12px; line-height:1.4;">Note: The Cashier operates independently with their own password. Use this channel to send instructions, data, or fee updates to the cashier.</p>
             <label style="color:#aaa; font-size:0.78rem; display:block; margin-bottom:4px;">Message Subject</label>
-            <input type="text" id="fhMsgSubj" placeholder="e.g. Fee Update, Payment Instruction" style="width:100%; padding:8px; border-radius:6px; border:1px solid #00e5e5; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none; margin-bottom:8px;">
+            <input type="text" id="fhMsgSubj" placeholder="Enter message subject" style="width:100%; padding:8px; border-radius:6px; border:1px solid #00e5e5; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none; margin-bottom:8px;">
             <label style="color:#aaa; font-size:0.78rem; display:block; margin-bottom:4px;">Message</label>
             <textarea id="fhMsgBody" placeholder="Type your message to the cashier..." rows="3" style="width:100%; padding:8px; border-radius:6px; border:1px solid #00e5e5; background:#111; color:#fff; font-size:0.85rem; box-sizing:border-box; outline:none; resize:vertical; margin-bottom:8px;"></textarea>
             <button class="btn-feat" style="border-color:#00e5e5; background:#003a3a; color:#00e5e5;" onclick="fhSendCashierMsg()">📨 Send to Cashier</button>
@@ -8103,6 +8210,8 @@ This is the first paragraph..."
 
         <div style="background:#111; border:1px solid #333; border-radius:10px; padding:16px; margin-top:14px;">
             <div style="color:#ffd700; font-weight:bold; font-size:0.85rem; margin-bottom:10px;">🔑 Change Finance Head Password</div>
+            <input type="password" id="fhNewHeadPwOld" placeholder="Enter current password"
+                style="width:100%; padding:9px; border-radius:6px; border:1px solid #ffd700; background:#111; color:#fff; font-size:0.88rem; box-sizing:border-box; outline:none; margin-bottom:8px;">
             <input type="password" id="fhNewHeadPw1" placeholder="New head of finance password"
                 style="width:100%; padding:9px; border-radius:6px; border:1px solid #ffd700; background:#111; color:#fff; font-size:0.88rem; box-sizing:border-box; outline:none; margin-bottom:8px;">
             <input type="password" id="fhNewHeadPw2" placeholder="Confirm new password"
@@ -8130,15 +8239,20 @@ This is the first paragraph..."
 
 
     async function fhChangeHeadPw() {
-        const p1 = document.getElementById('fhNewHeadPw1').value.trim();
-        const p2 = document.getElementById('fhNewHeadPw2').value.trim();
+        const old = document.getElementById('fhNewHeadPwOld').value.trim();
+        const p1  = document.getElementById('fhNewHeadPw1').value.trim();
+        const p2  = document.getElementById('fhNewHeadPw2').value.trim();
         const msg = document.getElementById('fhHeadPwMsg');
+        if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+        const oldHash = await sha256(old);
+        if (oldHash !== window.FINANCE_HEAD_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
         if (!p1 || p1.length < 6) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 6 characters.'; return; }
         if (p1 !== p2)             { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
         window.FINANCE_HEAD_PASSWORD = await sha256(p1);
         fbSavePasswords();
         auditLog('Password Changed', 'Head of Finance password was updated by Finance Head');
         msg.style.color='#4caf50'; msg.textContent='✅ Head of Finance password updated.';
+        document.getElementById('fhNewHeadPwOld').value = '';
         document.getElementById('fhNewHeadPw1').value = '';
         document.getElementById('fhNewHeadPw2').value = '';
     }
@@ -8167,7 +8281,9 @@ This is the first paragraph..."
             <td style="color:#00e5e5;">${d.dept}</td>
             <td style="text-align:center;">${d.transactions}</td>
             <td style="color:#ffd700; font-weight:bold;">ETB ${d.total.toLocaleString()}</td>
-        </tr>`).join('')}</tbody></table></div>` : '<p style="color:#555; padding:10px;"><em>No payments recorded yet.</em></p>'}`;
+        </tr>`).join('')}</tbody></table></div>
+        <button onclick="printSection('Finance Revenue Report', document.getElementById('fhContent').innerHTML.replace(/<button[^>]*>[\\s\\S]*?<\\/button>/g,''))" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:#ffd700; border:1px solid #ffd700; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print Report</button>`
+        : '<p style="color:#555; padding:10px;"><em>No payments recorded yet.</em></p>'}`;
     }
 
     /* ══════════════════════════════════════════════
@@ -8576,6 +8692,7 @@ This is the first paragraph..."
             </tr>`;
         });
         html += '</tbody></table></div>';
+        html += `<button onclick="printSection('Payment History — Student ${sid}', this.previousElementSibling.outerHTML)" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:#00e5e5; border:1px solid #00e5e5; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print History</button>`;
         area.innerHTML = html;
     }
 
@@ -8768,15 +8885,20 @@ This is the first paragraph..."
         if (tab === 'pending') cashierRenderPending();
     }
     async function cashierUpdateOwnPw() {
-        const p1 = document.getElementById('cashierPwNew1').value.trim();
-        const p2 = document.getElementById('cashierPwNew2').value.trim();
+        const old = document.getElementById('cashierPwOld').value.trim();
+        const p1  = document.getElementById('cashierPwNew1').value.trim();
+        const p2  = document.getElementById('cashierPwNew2').value.trim();
         const msg = document.getElementById('cashierPwMsg');
+        if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+        const oldHash = await sha256(old);
+        if (oldHash !== window.CASHIER_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
         if (!p1 || p1.length < 4) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 4 characters.'; return; }
         if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
         window.CASHIER_PASSWORD = await sha256(p1);
         fbSavePasswords(); /* auto-save hashed password to cloud */
         auditLog('Password Changed', 'Cashier password was updated');
         msg.style.color='#4caf50'; msg.textContent='✅ Cashier password updated successfully.';
+        document.getElementById('cashierPwOld').value = '';
         document.getElementById('cashierPwNew1').value = '';
         document.getElementById('cashierPwNew2').value = '';
     }
@@ -8821,6 +8943,7 @@ This is the first paragraph..."
             </tr>`;
         });
         html += '</tbody></table></div>';
+        html += `<button onclick="printSection('Student Payment Requests', document.getElementById('cashierPendingList').querySelector('table').outerHTML)" style="margin-top:10px; padding:7px 18px; background:#1a3a5c; color:#00e5e5; border:1px solid #00e5e5; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print Requests</button>`;
         area.innerHTML = html;
     }
 
