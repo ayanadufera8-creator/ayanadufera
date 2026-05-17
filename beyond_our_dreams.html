@@ -6957,7 +6957,7 @@ This is the first paragraph..."
             document.getElementById('permCurComboLabel').textContent = permWizCls + ' — ' + permWizLvl;
             /* pre-fill pass mark from existing combo if any */
             const existing = permMatrix.find(r => r.cls === permWizCls && r.level === permWizLvl);
-            const defaultPm = permWizLvl === 'Diploma' ? 250 : permWizLvl === 'Degree' ? 450 : permWizLvl === 'Masters' ? 500 : 580;
+            const defaultPm = 0;
             document.getElementById('permPassMarkInput').value = existing ? existing.passmark : defaultPm;
             permRenderDeptList(existing ? existing.depts : []);
             document.getElementById('permComboMsg').textContent = '';
@@ -7712,7 +7712,7 @@ This is the first paragraph..."
             /* ── PAYMENT GATE — NEW STUDENT ── */
             const newPayKey = 'NEW|' + name.toLowerCase() + '|' + dept + '|' + level + '|' + year;
             const newPayRecord = semesterPaymentTracker[newPayKey];
-            const regFeeNew = universalRegFee * 7;
+            const regFeeNew = newStudentRegFee;
 
             if (!newPayRecord || !newPayRecord.regFeePaid) {
                 err.innerHTML = `🔒 <strong>Registration Blocked — Registration Fee Not Paid.</strong><br>
@@ -9581,9 +9581,10 @@ This is the first paragraph..."
 
     /*
       universalRegFee — set by Head of Finance (old student registration fee).
-      New student registration fee = universalRegFee * 7
+      New student registration fee = newStudentRegFee (set independently by Finance Head)
     */
-    let universalRegFee = 500; /* ETB — editable by Finance Head */
+    let universalRegFee    = 0; /* ETB — old student reg fee, editable by Finance Head */
+    let newStudentRegFee   = 0; /* ETB — new student reg fee, editable by Finance Head */
 
     /*
       semesterPaymentTracker
@@ -10868,22 +10869,44 @@ This is the first paragraph..."
         area.innerHTML = `
         <!-- ── REGISTRATION FEE (Universal) ── -->
         <div style="background:#001a2a; border:1px solid #004080; border-radius:10px; padding:16px; margin-bottom:14px;">
-            <div style="color:#00a2ff; font-weight:bold; font-size:0.88rem; margin-bottom:8px;">🎓 Universal Registration Fee</div>
-            <p style="color:#aaa; font-size:0.78rem; margin-bottom:10px; line-height:1.5;">
-                This is the base registration fee for <strong>old students</strong>.<br>
-                <span style="color:#ffd700;">New student registration fee = this amount × 7.</span>
+            <div style="color:#00a2ff; font-weight:bold; font-size:0.88rem; margin-bottom:8px;">🎓 Registration Fees</div>
+            <p style="color:#aaa; font-size:0.78rem; margin-bottom:14px; line-height:1.5;">
+                Set registration fees separately for old and new students.
             </p>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <label style="color:#aaa; font-size:0.8rem;">Old Student Reg Fee (ETB):</label>
-                <input type="number" id="fhRegFeeInput" value="${universalRegFee}" min="0"
-                    style="width:120px; padding:8px; border-radius:6px; border:1px solid #004080; background:#111; color:#fff; font-size:0.9rem; outline:none;">
-                <button class="btn-feat" style="border-color:#00a2ff; background:#001a2a; color:#00a2ff; padding:8px 18px;" onclick="fhSaveRegFee()">💾 Save</button>
-                <span id="fhRegFeeMsg" style="font-size:0.8rem; min-height:16px;"></span>
+
+            <!-- Old Student -->
+            <div style="background:#0a1a2a; border:1px solid #004080; border-radius:8px; padding:12px; margin-bottom:10px;">
+                <div style="color:#00a2ff; font-size:0.78rem; font-weight:bold; margin-bottom:8px;">👤 Old Student Registration Fee</div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <label style="color:#aaa; font-size:0.8rem; white-space:nowrap;">Amount (ETB):</label>
+                    <input type="number" id="fhRegFeeInput" value="${universalRegFee}" min="0"
+                        style="width:130px; padding:8px; border-radius:6px; border:1px solid #004080; background:#111; color:#fff; font-size:0.9rem; outline:none;">
+                    <button class="btn-feat" style="border-color:#00a2ff; background:#001a2a; color:#00a2ff; padding:8px 18px;" onclick="fhSaveRegFee()">💾 Save</button>
+                </div>
+                <div style="margin-top:8px; font-size:0.8rem; color:#aaa;">
+                    Current: <strong style="color:#00a2ff;">ETB ${universalRegFee.toLocaleString()}</strong>
+                </div>
             </div>
-            <div style="margin-top:10px; display:flex; gap:16px; flex-wrap:wrap; font-size:0.82rem;">
-                <span style="color:#aaa;">Old student rate: <strong style="color:#00a2ff;">ETB ${universalRegFee.toLocaleString()}</strong></span>
-                <span style="color:#aaa;">New student rate: <strong style="color:#ffd700;">ETB ${(universalRegFee * 7).toLocaleString()}</strong></span>
+
+            <!-- New Student -->
+            <div style="background:#0a1a2a; border:1px solid #ffd700; border-radius:8px; padding:12px;">
+                <div style="color:#ffd700; font-size:0.78rem; font-weight:bold; margin-bottom:8px;">🆕 New Student Registration Fee <span style="color:#ff9800; font-size:0.72rem;">(×7 of old student rate)</span></div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <label style="color:#aaa; font-size:0.8rem; white-space:nowrap;">Amount (ETB):</label>
+                    <input type="number" id="fhNewRegFeeInput" value="${newStudentRegFee}" min="0"
+                        style="width:130px; padding:8px; border-radius:6px; border:1px solid #ffd700; background:#111; color:#ffd700; font-size:0.9rem; outline:none; font-weight:bold;">
+                    <button class="btn-feat" style="border-color:#ffd700; background:#1a1400; color:#ffd700; padding:8px 18px;" onclick="fhSaveNewRegFee()">💾 Save</button>
+                </div>
+                <div style="margin-top:6px; font-size:0.75rem; color:#888;">
+                    💡 Suggested: <span id="fhNewRegFeeSuggested" style="color:#ff9800; font-weight:bold;">ETB ${(universalRegFee * 7).toLocaleString()}</span>
+                    &nbsp;(old rate × 7) — you may enter any amount.
+                </div>
+                <div style="margin-top:6px; font-size:0.8rem; color:#aaa;">
+                    Current: <strong style="color:#ffd700;">ETB ${newStudentRegFee.toLocaleString()}</strong>
+                </div>
             </div>
+
+            <div id="fhRegFeeMsg" style="font-size:0.8rem; min-height:16px; margin-top:8px;"></div>
         </div>
 
         <!-- ── MONTHLY FEE MATRIX ── -->
@@ -10958,10 +10981,22 @@ This is the first paragraph..."
     function fhSaveRegFee() {
         const val = parseFloat(document.getElementById('fhRegFeeInput').value);
         const msg = document.getElementById('fhRegFeeMsg');
-        if (!val || val <= 0) { msg.style.color='#cc0000'; msg.textContent='⚠ Enter a valid amount.'; return; }
+        if (!val || val <= 0) { msg.style.color='#cc0000'; msg.textContent='⚠ Enter a valid old student reg fee amount.'; return; }
         universalRegFee = val;
+        /* Update the ×7 suggestion hint */
+        const hint = document.getElementById('fhNewRegFeeSuggested');
+        if (hint) hint.textContent = 'ETB ' + (val * 7).toLocaleString();
         msg.style.color='#4caf50';
-        msg.textContent=`✅ Saved — Old: ETB ${val.toLocaleString()}, New: ETB ${(val*7).toLocaleString()}`;
+        msg.textContent=`✅ Old student reg fee saved — ETB ${val.toLocaleString()} (×7 suggested: ETB ${(val*7).toLocaleString()})`;
+    }
+
+    function fhSaveNewRegFee() {
+        const val = parseFloat(document.getElementById('fhNewRegFeeInput').value);
+        const msg = document.getElementById('fhRegFeeMsg');
+        if (!val || val <= 0) { msg.style.color='#cc0000'; msg.textContent='⚠ Enter a valid new student reg fee amount.'; return; }
+        newStudentRegFee = val;
+        msg.style.color='#4caf50';
+        msg.textContent=`✅ New student reg fee saved — ETB ${val.toLocaleString()}`;
     }
 
     function fhAddMonthlyRate() {
@@ -11588,7 +11623,7 @@ This is the first paragraph..."
     function cashierCollectRegFee(sid, year, sem, isNew) {
         const tracker = getPayTracker(sid, year, sem);
         if (tracker.regFeePaid) { alert('✅ Registration fee already paid for ' + year + ' — ' + sem); return; }
-        const regFee = isNew ? universalRegFee * 7 : universalRegFee;
+        const regFee = isNew ? newStudentRegFee : universalRegFee;
         const label  = isNew ? `New Student Registration Fee — ${year} ${sem}` : `Registration Fee — ${year} ${sem}`;
         if (!confirm(`Record registration fee payment of ETB ${regFee.toLocaleString()} for student ${sid}?`)) return;
         tracker.regFeePaid = true;
@@ -11729,7 +11764,7 @@ This is the first paragraph..."
         if (!dept || !cls || !lvl) { info.innerHTML = '<span style="color:#888;">Select Department, Classification, and Level to see fee amounts.</span>'; return; }
         const key = dept + '|' + cls + '|' + lvl;
         const monthlyRate = monthlyFeeMatrix[key] || 0;
-        const regFeeNew   = universalRegFee * 7;
+        const regFeeNew   = newStudentRegFee;
         info.innerHTML = monthlyRate > 0
             ? `<span style="color:#aaa;">Registration fee (new): <strong style="color:#ffd700;">ETB ${regFeeNew.toLocaleString()}</strong> &nbsp;|&nbsp; Monthly tuition: <strong style="color:#4caf50;">ETB ${monthlyRate.toLocaleString()}</strong> &nbsp;|&nbsp; Penalty rate: <strong style="color:#ff6600;">${monthlyRate >= 1000 ? '20%' : '10%'}</strong></span>`
             : `<span style="color:#ffae00;">⚠ Monthly fee rate not set for ${dept} | ${cls} | ${lvl}. Finance Head must set it in the Fee Matrix first.</span>`;
