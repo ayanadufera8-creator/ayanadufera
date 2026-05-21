@@ -30,6 +30,9 @@
         window._fbUnsubs = window._fbUnsubs || []; /* init early */
         window.deptHeadPasswords = window.deptHeadPasswords || {}; /* init early */
         window.ATTENDANCE_PASSWORD = window.ATTENDANCE_PASSWORD || ''; /* dedicated attendance lock */
+        window.EXAM_CENTER_PASSWORD = window.EXAM_CENTER_PASSWORD || ''; /* dedicated exam center lock */
+        window.resultsPortalOpen     = localStorage.getItem('hmi_resultsPortalOpen') === 'true';
+        window.resultsPortalDeadline = null; /* Date — auto-close deadline */
         window.deptExamAttendanceThresholds = window.deptExamAttendanceThresholds || {}; /* dept → minimum % to sit exam */
 
         /* ── Exam system globals — init early so fbLoadAll can populate them
@@ -92,6 +95,7 @@
                 teacherPassword:      window.TEACHER_PASSWORD       || '',
                 serverAccessPassword: window.SERVER_ACCESS_PASSWORD || '',
                 attendancePassword:   window.ATTENDANCE_PASSWORD    || '',
+                examCenterPassword:   window.EXAM_CENTER_PASSWORD   || '',
                 deptHeadPasswords:    window.deptHeadPasswords      || {}
             });
         }
@@ -116,7 +120,9 @@
                 regDeptDeadlines:     deadlinesObj,
                 permDeadlineEnd:      (typeof permDeadlineEnd    !== 'undefined' && permDeadlineEnd    instanceof Date) ? permDeadlineEnd.toISOString()    : (typeof permDeadlineEnd    !== 'undefined' ? permDeadlineEnd    : null),
                 oldRegPermCriteria:   typeof oldRegPermCriteria  !== 'undefined' ? oldRegPermCriteria  : null,
-                oldPermDeadlineEnd:   (typeof oldPermDeadlineEnd !== 'undefined' && oldPermDeadlineEnd instanceof Date) ? oldPermDeadlineEnd.toISOString() : (typeof oldPermDeadlineEnd !== 'undefined' ? oldPermDeadlineEnd : null)
+                oldPermDeadlineEnd:   (typeof oldPermDeadlineEnd !== 'undefined' && oldPermDeadlineEnd instanceof Date) ? oldPermDeadlineEnd.toISOString() : (typeof oldPermDeadlineEnd !== 'undefined' ? oldPermDeadlineEnd : null),
+                resultsPortalOpen:    window.resultsPortalOpen    || false,
+                resultsPortalDeadline:(window.resultsPortalDeadline instanceof Date) ? window.resultsPortalDeadline.toISOString() : null
             });
         }
 
@@ -269,6 +275,7 @@
                     if (pw.teacherPassword)      window.TEACHER_PASSWORD       = pw.teacherPassword;
                     if (pw.serverAccessPassword) window.SERVER_ACCESS_PASSWORD = pw.serverAccessPassword;
                     if (pw.attendancePassword)   window.ATTENDANCE_PASSWORD    = pw.attendancePassword;
+                    if (pw.examCenterPassword)   window.EXAM_CENTER_PASSWORD   = pw.examCenterPassword;
                     if (pw.deptHeadPasswords) { if (!window.deptHeadPasswords) window.deptHeadPasswords = {}; Object.assign(window.deptHeadPasswords, pw.deptHeadPasswords); }
 
                     /* Auto-migrate: if any stored password is still plain text, hash it and re-save */
@@ -281,6 +288,7 @@
                     if (isPlain(window.TEACHER_PASSWORD))       { window.TEACHER_PASSWORD       = await sha256(window.TEACHER_PASSWORD);       needsMigration = true; }
                     if (isPlain(window.SERVER_ACCESS_PASSWORD)) { window.SERVER_ACCESS_PASSWORD = await sha256(window.SERVER_ACCESS_PASSWORD); needsMigration = true; }
                     if (window.ATTENDANCE_PASSWORD && isPlain(window.ATTENDANCE_PASSWORD)) { window.ATTENDANCE_PASSWORD = await sha256(window.ATTENDANCE_PASSWORD); needsMigration = true; }
+                    if (window.EXAM_CENTER_PASSWORD && isPlain(window.EXAM_CENTER_PASSWORD)) { window.EXAM_CENTER_PASSWORD = await sha256(window.EXAM_CENTER_PASSWORD); needsMigration = true; }
                     for (const dept of Object.keys(window.deptHeadPasswords || {})) {
                         if (isPlain(window.deptHeadPasswords[dept])) {
                             window.deptHeadPasswords[dept] = await sha256(window.deptHeadPasswords[dept]);
@@ -395,6 +403,25 @@
                         } else if (!isNaN(dl.getTime())) {
                             /* Deadline passed while offline — close old reg */
                             if (typeof oldRegPermCriteria !== 'undefined') oldRegPermCriteria.open = false;
+                            fbSavePermSettings();
+                        }
+                    }
+
+                    /* ── Restore Results Portal open state + deadline ── */
+                    if (ps.resultsPortalOpen !== undefined) {
+                        window.resultsPortalOpen = ps.resultsPortalOpen;
+                        localStorage.setItem('hmi_resultsPortalOpen', window.resultsPortalOpen ? 'true' : 'false');
+                    }
+                    if (ps.resultsPortalDeadline) {
+                        const rdl = new Date(ps.resultsPortalDeadline);
+                        if (!isNaN(rdl.getTime()) && Date.now() < rdl.getTime()) {
+                            window.resultsPortalDeadline = rdl;
+                            if (typeof _startResultsPortalDeadlineTimer === 'function') _startResultsPortalDeadlineTimer();
+                        } else if (!isNaN(rdl.getTime())) {
+                            /* Deadline passed while offline — auto-close */
+                            window.resultsPortalDeadline = null;
+                            window.resultsPortalOpen = false;
+                            localStorage.setItem('hmi_resultsPortalOpen', 'false');
                             fbSavePermSettings();
                         }
                     }
@@ -513,6 +540,24 @@
                     oldPermDeadlineEnd = (ps.oldPermDeadlineEnd) ? new Date(ps.oldPermDeadlineEnd) : null;
                     if (oldPermDeadlineEnd && isNaN(oldPermDeadlineEnd.getTime())) oldPermDeadlineEnd = null;
                     if (oldPermDeadlineEnd && Date.now() >= oldPermDeadlineEnd.getTime()) oldPermDeadlineEnd = null;
+                }
+                /* ── Sync Results Portal open state + deadline ── */
+                if (ps.resultsPortalOpen !== undefined) {
+                    window.resultsPortalOpen = ps.resultsPortalOpen;
+                    localStorage.setItem('hmi_resultsPortalOpen', window.resultsPortalOpen ? 'true' : 'false');
+                }
+                if (ps.resultsPortalDeadline) {
+                    const rdl = new Date(ps.resultsPortalDeadline);
+                    if (!isNaN(rdl.getTime()) && Date.now() < rdl.getTime()) {
+                        window.resultsPortalDeadline = rdl;
+                        _startResultsPortalDeadlineTimer();
+                    } else {
+                        window.resultsPortalDeadline = null;
+                        if (ps.resultsPortalDeadline) { /* deadline passed — auto-close */
+                            window.resultsPortalOpen = false;
+                            localStorage.setItem('hmi_resultsPortalOpen', 'false');
+                        }
+                    }
                 }
                 if (typeof updatePermUI === 'function') updatePermUI();
                 if (typeof regStartCountdownTicker === 'function') regStartCountdownTicker();
@@ -2606,10 +2651,32 @@
                 });
                 document.getElementById('content-view').innerHTML = '';
             } else if (proj === 'ExamCenter') {
+                /* ── Password Gate ── */
+                if (window.EXAM_CENTER_PASSWORD && !window._examCenterSessionUnlocked) {
+                    document.getElementById('content-view').innerHTML = `
+                        <div style="max-width:380px;margin:40px auto 0;text-align:center;font-family:'Segoe UI',sans-serif;">
+                            <div style="font-size:2.4rem;margin-bottom:10px;">🔐</div>
+                            <div style="color:#00e5ff;font-weight:bold;font-size:1rem;margin-bottom:6px;">Exam Center</div>
+                            <div style="color:#444;font-size:0.78rem;margin-bottom:20px;">Enter the password to access the Exam Center dashboard.</div>
+                            <input type="password" id="ecGateInput" placeholder="Exam Center password"
+                                style="width:100%;padding:11px 14px;border-radius:9px;border:1.5px solid #00688b;background:#071a2a;color:#fff;font-size:0.92rem;box-sizing:border-box;outline:none;margin-bottom:10px;"
+                                onkeydown="if(event.key==='Enter') _ecGateUnlock()">
+                            <div id="ecGateErr" style="min-height:18px;font-size:0.82rem;color:#ff5252;margin-bottom:12px;"></div>
+                            <button onclick="_ecGateUnlock()"
+                                style="width:100%;padding:11px;background:#00688b;color:#fff;border:1px solid #00a8d8;border-radius:9px;font-size:0.92rem;font-weight:bold;cursor:pointer;">
+                                🔓 Unlock
+                            </button>
+                        </div>`;
+                    setTimeout(() => { const i=document.getElementById('ecGateInput'); if(i) i.focus(); }, 60);
+                    return;
+                }
+                /* ── Inner Dashboard ── */
                 /* Exam Center Panel — sub-buttons */
                 const examItems = [
-                    { label: '🗂️ Exam Bank',   fn: 'openExamBank',           color: '#00e5ff', bg: 'linear-gradient(180deg,#001a2a,#000f1a)', border: '#00688b' },
-                    { label: '🔓 Open Exam',   fn: 'openExamSetup',          color: '#ffae00', bg: 'linear-gradient(180deg,#2a1800,#1a0f00)', border: '#5c3d00' },
+                    { label: '🗂️ Exam Bank',        fn: 'openExamBank',              color: '#00e5ff', bg: 'linear-gradient(180deg,#001a2a,#000f1a)', border: '#00688b' },
+                    { label: '🔓 Open Exam',         fn: 'openExamSetup',             color: '#ffae00', bg: 'linear-gradient(180deg,#2a1800,#1a0f00)', border: '#5c3d00' },
+                    { label: '📊 Results Portal',    fn: 'openResultsPortalPanel',    color: '#81c784', bg: 'linear-gradient(180deg,#001a0a,#000d06)', border: '#2e7d32' },
+                    { label: '🔑 Password',          fn: 'openExamCenterPwPanel',     color: '#ffd700', bg: 'linear-gradient(180deg,#1a1200,#0d0900)', border: '#4a3800' },
                 ];
                 examItems.forEach(item => {
                     let b = document.createElement('button');
@@ -2647,7 +2714,258 @@
             }
         }
 
-        /* ── Active category tracking ── */
+        /* ── Exam Center Gate (tier-level) Unlock ── */
+        async function _ecGateUnlock() {
+            const inp = document.getElementById('ecGateInput');
+            const err = document.getElementById('ecGateErr');
+            const entered = inp ? inp.value.trim() : '';
+            if (!entered) { if(err) err.textContent='❌ Please enter the password.'; return; }
+            if(err) err.textContent='⏳ Verifying…';
+            const hash = await sha256(entered);
+            if (hash !== window.EXAM_CENTER_PASSWORD) {
+                if(err) err.textContent='❌ Incorrect password.';
+                if(inp) { inp.value=''; inp.focus(); inp.style.borderColor='#ff5252'; setTimeout(()=>{ if(inp) inp.style.borderColor='#00688b'; },1200); }
+                return;
+            }
+            /* ✅ Correct — unlock for this session and load the full panel */
+            window._examCenterSessionUnlocked = true;
+            const btn = document.getElementById('btn-exam');
+            if(btn) loadTier3('ExamCenter', btn);
+        }
+
+        /* ── Exam Center Password Helpers ── */
+        /* Show the inline lock prompt in content-view, then call callbackFn on success */
+        function showExamCenterLockPrompt(callbackFn) {
+            /* Open the dedicated password overlay */
+            const ov = document.getElementById('examCenterPwOverlay');
+            if (ov) {
+                ov.dataset.callback = callbackFn || '';
+                ov.style.display = 'flex';
+                const inp = document.getElementById('ecpwInput');
+                if (inp) { inp.value = ''; inp.focus(); }
+                const err = document.getElementById('ecpwErr');
+                if (err) err.textContent = '';
+            }
+        }
+
+        async function examCenterPwUnlock() {
+            const inp = document.getElementById('ecpwInput');
+            const err = document.getElementById('ecpwErr');
+            const entered = inp ? inp.value.trim() : '';
+            if (!entered) { if (err) err.textContent = '❌ Please enter the password.'; return; }
+            if (!window.EXAM_CENTER_PASSWORD) { if (err) err.innerHTML = '⚠️ No Exam Center password set yet.<br><span style="color:#ffb74d;font-size:0.72rem;">Use 🔑 Password in the Exam Center panel to set one.</span>'; return; }
+            if (err) err.textContent = '⏳ Verifying…';
+            const hash = await sha256(entered);
+            if (hash !== window.EXAM_CENTER_PASSWORD) {
+                if (err) err.textContent = '❌ Incorrect password.';
+                if (inp) { inp.value = ''; inp.focus(); inp.style.borderColor = '#ff5252'; setTimeout(() => { if(inp) inp.style.borderColor = '#00688b'; }, 1200); }
+                return;
+            }
+            /* ✅ Correct */
+            window._examCenterSessionUnlocked = true;
+            const ov = document.getElementById('examCenterPwOverlay');
+            const cb = ov ? ov.dataset.callback : '';
+            if (ov) ov.style.display = 'none';
+            if (cb && typeof window[cb] === 'function') window[cb]();
+        }
+
+        /* ── Exam Center Password Management Panel ── */
+        function openExamCenterPwPanel() {
+            const isSet = !!window.EXAM_CENTER_PASSWORD;
+            const ov    = document.getElementById('examCenterMgmtOverlay');
+            if (!ov) return;
+            /* Status */
+            const statusEl = document.getElementById('ecMgmtStatus');
+            if (statusEl) {
+                statusEl.style.color   = isSet ? '#4caf50' : '#ff7043';
+                statusEl.style.background = isSet ? '#071a07' : '#1a0700';
+                statusEl.textContent   = isSet
+                    ? '✅ Password is SET — Exam Bank & Open Exam are protected.'
+                    : '⚠️ No password set — Exam Center is currently unprotected.';
+            }
+            /* Show/hide old-password field */
+            const oldWrap = document.getElementById('ecMgmtOldWrap');
+            if (oldWrap) oldWrap.style.display = isSet ? '' : 'none';
+            /* Show remove section only if password exists */
+            const removeSection = document.getElementById('ecMgmtRemoveSection');
+            if (removeSection) removeSection.style.display = isSet ? '' : 'none';
+            /* Clear fields */
+            ['ecMgmtOld','ecMgmtNew1','ecMgmtNew2','ecMgmtRemoveConfirm'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+            ['ecMgmtMsg','ecMgmtRemoveMsg'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=''; });
+            ov.style.display = 'flex';
+            setTimeout(() => { const f = document.getElementById(isSet ? 'ecMgmtOld' : 'ecMgmtNew1'); if(f) f.focus(); }, 80);
+        }
+
+        async function ecMgmtSave() {
+            const isSet = !!window.EXAM_CENTER_PASSWORD;
+            const old   = document.getElementById('ecMgmtOld')  ? document.getElementById('ecMgmtOld').value.trim()  : '';
+            const p1    = document.getElementById('ecMgmtNew1') ? document.getElementById('ecMgmtNew1').value.trim() : '';
+            const p2    = document.getElementById('ecMgmtNew2') ? document.getElementById('ecMgmtNew2').value.trim() : '';
+            const msg   = document.getElementById('ecMgmtMsg');
+            if (isSet) {
+                if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
+                const oldHash = await sha256(old);
+                if (oldHash !== window.EXAM_CENTER_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
+            }
+            if (!p1 || p1.length < 6) { msg.style.color='#cc0000'; msg.textContent='❌ New password must be at least 6 characters.'; return; }
+            if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
+            window.EXAM_CENTER_PASSWORD = await sha256(p1);
+            window._examCenterSessionUnlocked = false;
+            await fbSavePasswords();
+            if (typeof auditLog === 'function') auditLog('Exam Center Password ' + (isSet?'Changed':'Set'), 'Exam Center password was ' + (isSet?'updated':'created'));
+            msg.style.color='#4caf50'; msg.textContent='✅ Password ' + (isSet?'updated':'set') + ' successfully.';
+            setTimeout(() => openExamCenterPwPanel(), 1200);
+        }
+
+        async function ecMgmtRemove() {
+            const confirmEl = document.getElementById('ecMgmtRemoveConfirm');
+            const msg       = document.getElementById('ecMgmtRemoveMsg');
+            const entered   = confirmEl ? confirmEl.value.trim() : '';
+            if (!entered) { msg.style.color='#cc0000'; msg.textContent='❌ Enter the current password to confirm.'; return; }
+            const hash = await sha256(entered);
+            if (hash !== window.EXAM_CENTER_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Incorrect password. Cannot remove.'; return; }
+            window.EXAM_CENTER_PASSWORD = '';
+            window._examCenterSessionUnlocked = false;
+            await fbSavePasswords();
+            if (typeof auditLog === 'function') auditLog('Exam Center Password Removed', 'Exam Center password was removed');
+            msg.style.color='#ff9800'; msg.textContent='⚠️ Password removed. Exam Center is now unprotected.';
+            setTimeout(() => openExamCenterPwPanel(), 1200);
+        }
+
+
+
+        /* ══════════════════════════════════════════════════════
+           RESULTS PORTAL — Open/Close Permission with Deadline
+        ══════════════════════════════════════════════════════ */
+        let _rpDeadlineTimer = null;
+
+        function _startResultsPortalDeadlineTimer() {
+            if (_rpDeadlineTimer) { clearInterval(_rpDeadlineTimer); _rpDeadlineTimer = null; }
+            if (!window.resultsPortalDeadline) return;
+            _rpDeadlineTimer = setInterval(() => {
+                if (!window.resultsPortalDeadline) { clearInterval(_rpDeadlineTimer); _rpDeadlineTimer = null; return; }
+                if (Date.now() >= window.resultsPortalDeadline.getTime()) {
+                    clearInterval(_rpDeadlineTimer); _rpDeadlineTimer = null;
+                    window.resultsPortalDeadline = null;
+                    window.resultsPortalOpen = false;
+                    localStorage.setItem('hmi_resultsPortalOpen', 'false');
+                    fbSavePermSettings();
+                    if (typeof auditLog === 'function') auditLog('Results Portal Auto-Closed', 'Deadline reached — portal closed automatically');
+                    _rpUpdateStatus();
+                } else {
+                    _rpUpdateStatus();
+                }
+            }, 30000);
+        }
+
+        function _rpCountdown() {
+            if (!window.resultsPortalDeadline) return '';
+            const rem = window.resultsPortalDeadline - Date.now();
+            if (rem <= 0) return '';
+            const d = Math.floor(rem / 86400000);
+            const h = Math.floor((rem % 86400000) / 3600000);
+            const m = Math.floor((rem % 3600000) / 60000);
+            return `⏳ Auto-closes in: ${d}d ${h}h ${m}m — Deadline: ${window.resultsPortalDeadline.toLocaleString()}`;
+        }
+
+        function _rpUpdateStatus() {
+            const s = document.getElementById('rpStatus');
+            const t = document.getElementById('rpTimerLine');
+            const isOpen = !!window.resultsPortalOpen;
+            if (s) {
+                s.textContent  = isOpen ? '🟢 OPEN — Students can view their results.' : '🔴 CLOSED — Students cannot access results.';
+                s.style.color  = isOpen ? '#4caf50' : '#e53935';
+                s.style.background = isOpen ? '#071a07' : '#1a0000';
+            }
+            if (t) { t.textContent = _rpCountdown(); t.style.color = '#81c784'; }
+            const openBtn  = document.getElementById('rpOpenBtn');
+            const closeBtn = document.getElementById('rpCloseBtn');
+            if (openBtn)  { openBtn.style.opacity  = isOpen ? '0.45' : '1'; openBtn.disabled  = isOpen; }
+            if (closeBtn) { closeBtn.style.opacity = isOpen ? '1' : '0.45'; closeBtn.disabled = !isOpen; }
+        }
+
+        function openResultsPortalPanel() {
+            const ov = document.getElementById('resultsPortalMgmtOverlay');
+            if (!ov) return;
+            ov.style.display = 'flex';
+            /* Default deadline to 7 days from now if field is empty */
+            const dtInput = document.getElementById('rpDeadlineDt');
+            if (dtInput && !dtInput.value) {
+                const def = new Date(Date.now() + 7 * 86400000);
+                const pad = n => String(n).padStart(2,'0');
+                dtInput.value = `${def.getFullYear()}-${pad(def.getMonth()+1)}-${pad(def.getDate())}T${pad(def.getHours())}:${pad(def.getMinutes())}`;
+            }
+            /* If a deadline is active, reflect it in the picker */
+            if (window.resultsPortalDeadline) {
+                const dtInput2 = document.getElementById('rpDeadlineDt');
+                const pad = n => String(n).padStart(2,'0');
+                const dl = window.resultsPortalDeadline;
+                if (dtInput2) dtInput2.value = `${dl.getFullYear()}-${pad(dl.getMonth()+1)}-${pad(dl.getDate())}T${pad(dl.getHours())}:${pad(dl.getMinutes())}`;
+                const cb = document.getElementById('rpUseDeadline');
+                if (cb) cb.checked = true;
+                _rpToggleDeadlineRow();
+            }
+            _rpUpdateStatus();
+            if (window._rpOverlayTick) clearInterval(window._rpOverlayTick);
+            window._rpOverlayTick = setInterval(_rpUpdateStatus, 60000);
+        }
+
+        function closeResultsPortalPanel() {
+            const ov = document.getElementById('resultsPortalMgmtOverlay');
+            if (ov) ov.style.display = 'none';
+            if (window._rpOverlayTick) { clearInterval(window._rpOverlayTick); window._rpOverlayTick = null; }
+        }
+
+        function _rpToggleDeadlineRow() {
+            const cb  = document.getElementById('rpUseDeadline');
+            const row = document.getElementById('rpDeadlineRow');
+            if (row) row.style.display = (cb && cb.checked) ? '' : 'none';
+        }
+
+        async function rpOpen() {
+            const dtInput    = document.getElementById('rpDeadlineDt');
+            const useDeadline = document.getElementById('rpUseDeadline') && document.getElementById('rpUseDeadline').checked;
+            const msg        = document.getElementById('rpMsg');
+            if (msg) msg.textContent = '';
+
+            if (useDeadline && dtInput && dtInput.value) {
+                const dl = new Date(dtInput.value);
+                if (isNaN(dl.getTime()) || dl <= new Date()) {
+                    if (msg) { msg.style.color='#cc0000'; msg.textContent='❌ Deadline must be a future date/time.'; }
+                    return;
+                }
+                window.resultsPortalDeadline = dl;
+                _startResultsPortalDeadlineTimer();
+            } else {
+                if (_rpDeadlineTimer) { clearInterval(_rpDeadlineTimer); _rpDeadlineTimer = null; }
+                window.resultsPortalDeadline = null;
+            }
+
+            window.resultsPortalOpen = true;
+            localStorage.setItem('hmi_resultsPortalOpen', 'true');
+            await fbSavePermSettings();
+            if (typeof auditLog === 'function') auditLog('Results Portal Opened', window.resultsPortalDeadline ? `Portal opened until ${window.resultsPortalDeadline.toLocaleString()}` : 'Portal opened with no deadline');
+            if (msg) {
+                msg.style.color = '#4caf50';
+                msg.textContent = window.resultsPortalDeadline
+                    ? `✅ Portal OPENED — auto-closes on ${window.resultsPortalDeadline.toLocaleString()}`
+                    : '✅ Portal OPENED — no auto-close set.';
+            }
+            _rpUpdateStatus();
+        }
+
+        async function rpClose() {
+            if (_rpDeadlineTimer) { clearInterval(_rpDeadlineTimer); _rpDeadlineTimer = null; }
+            window.resultsPortalDeadline = null;
+            window.resultsPortalOpen = false;
+            localStorage.setItem('hmi_resultsPortalOpen', 'false');
+            await fbSavePermSettings();
+            if (typeof auditLog === 'function') auditLog('Results Portal Closed', 'Results Portal was manually closed');
+            const msg = document.getElementById('rpMsg');
+            if (msg) { msg.style.color='#ff9800'; msg.textContent='🔒 Portal CLOSED — students can no longer view results.'; }
+            _rpUpdateStatus();
+        }
+
         let _activeCategory = '';
         let _drillTrail = []; // [{label, fn}]
 
@@ -3118,10 +3436,31 @@
         /* ── Open Attendance Panel for a specific course ── */
         function openAttendancePanel(cls, lvl, dept, year, sem, courseId, relevantRows) {
             const attKey = cls + '|' + lvl + '|' + dept + '|' + year + '|' + sem + '|' + courseId;
+            const todayStr = new Date().toISOString().slice(0, 10);
 
-            /* ── Load students enrolled in this course from courseScoreData ──
-               FIX: case-insensitive column header match so "HCI0020", "hci0020",
-               " HCI0020" all resolve to the correct column.                     */
+            /* ── Priority 1: attendanceData already has students for this key
+               (registered via Course List upload — use them directly) ── */
+            if (attendanceData[attKey] && attendanceData[attKey].length) {
+                /* Merge any new students that may have been added to the group since registration */
+                const normalize = v => (v || '').toString().trim().toUpperCase();
+                const groupStudents = studentListData.filter(s =>
+                    normalize(s.classification) === normalize(cls) &&
+                    normalize(s.level)          === normalize(lvl) &&
+                    normalize(s.department)     === normalize(dept) &&
+                    normalize(s.year)           === normalize(year) &&
+                    normalize(s.semester)       === normalize(sem)
+                );
+                groupStudents.forEach(s => {
+                    const sid = (s['student id'] || '').trim();
+                    if (sid && !attendanceData[attKey].find(r => r.sid === sid)) {
+                        attendanceData[attKey].push({ sid, name: s['full name'] || '', dates: {} });
+                    }
+                });
+                renderAttendancePanel(attKey, todayStr, courseId, cls, lvl, dept, year, sem, relevantRows);
+                return;
+            }
+
+            /* ── Priority 2: try courseScoreData for enrolled students ── */
             const enrolledRows = (relevantRows || []).filter(r => {
                 if (r[courseId] !== undefined && r[courseId] !== null && r[courseId] !== '') return true;
                 const ciKey = Object.keys(r).find(k => k.trim().toUpperCase() === courseId);
@@ -3130,7 +3469,6 @@
                 return val !== undefined && val !== null && val !== '';
             });
 
-            /* Build student list, normalising SID comparison */
             const enrolled = enrolledRows.map(r => {
                 const sid = (r['student id'] || r['Student ID'] || r['Student Id'] || '').trim();
                 const student = studentListData.find(s =>
@@ -3142,31 +3480,43 @@
                 };
             }).filter(s => s.sid);
 
-            /* FIX Bug 3: if courseScoreData gave no rows but Firebase already has
-               attendance records for this key, open them directly — data is there. */
-            if (!enrolled.length && attendanceData[attKey] && attendanceData[attKey].length) {
-                const todayStr = new Date().toISOString().slice(0, 10);
+            if (!enrolled.length) {
+                /* ── Priority 3: fall back to ALL students in this group ── */
+                const normalize = v => (v || '').toString().trim().toUpperCase();
+                const groupStudents = studentListData.filter(s =>
+                    normalize(s.classification) === normalize(cls) &&
+                    normalize(s.level)          === normalize(lvl) &&
+                    normalize(s.department)     === normalize(dept) &&
+                    normalize(s.year)           === normalize(year) &&
+                    normalize(s.semester)       === normalize(sem)
+                ).map(s => ({
+                    sid:  (s['student id'] || '').trim(),
+                    name: s['full name'] || ''
+                })).filter(s => s.sid);
+
+                if (!groupStudents.length) {
+                    document.getElementById('content-view').innerHTML = `
+                        <div style="max-width:500px; margin:20px auto; background:#1a0a00; border:1px solid #5c3d00; border-radius:10px; padding:18px 20px; font-family:'Segoe UI',sans-serif;">
+                            <div style="color:#ffae00; font-size:0.88rem; font-weight:bold; margin-bottom:8px;">⚠ No Students Found for <span style="color:#fff;">${courseId}</span></div>
+                            <div style="color:#aaa; font-size:0.78rem; line-height:1.6;">
+                                No students are registered under <strong style="color:#ffd700;">${cls} · ${lvl} · ${dept} · ${year} · ${sem}</strong>.<br>
+                                Add students through Registration, or upload a Course List in the Dept Head → Course List tab to auto-register them.
+                            </div>
+                        </div>`;
+                    return;
+                }
+
+                /* Init from group students */
+                attendanceData[attKey] = groupStudents.map(s => ({ sid: s.sid, name: s.name, dates: {} }));
+                fbSave('hmi_data', 'attendanceData', { data: attendanceData });
                 renderAttendancePanel(attKey, todayStr, courseId, cls, lvl, dept, year, sem, relevantRows);
                 return;
             }
 
-            if (!enrolled.length) {
-                document.getElementById('content-view').innerHTML = `
-                    <div style="max-width:500px; margin:20px auto; background:#1a0a00; border:1px solid #5c3d00; border-radius:10px; padding:18px 20px; font-family:'Segoe UI',sans-serif;">
-                        <div style="color:#ffae00; font-size:0.88rem; font-weight:bold; margin-bottom:8px;">⚠ No Students Found for <span style="color:#fff;">${courseId}</span></div>
-                        <div style="color:#aaa; font-size:0.78rem; line-height:1.6;">
-                            No students in this group have a score entry for <strong style="color:#ffd700;">${courseId}</strong>.<br>
-                            Ensure the score sheet has a <strong style="color:#fff;">${courseId}</strong> column with student values uploaded.
-                        </div>
-                    </div>`;
-                return;
-            }
-
-            /* ── Init or sync attendance record ── */
+            /* Init or sync from scoreData */
             if (!attendanceData[attKey]) {
                 attendanceData[attKey] = enrolled.map(s => ({ sid: s.sid, name: s.name, dates: {} }));
             } else {
-                /* Add any newly enrolled students not yet in the record */
                 enrolled.forEach(s => {
                     if (!attendanceData[attKey].find(r => r.sid === s.sid)) {
                         attendanceData[attKey].push({ sid: s.sid, name: s.name, dates: {} });
@@ -3174,7 +3524,6 @@
                 });
             }
 
-            const todayStr = new Date().toISOString().slice(0, 10);
             renderAttendancePanel(attKey, todayStr, courseId, cls, lvl, dept, year, sem, relevantRows);
         }
 
@@ -6077,7 +6426,8 @@ This is the first paragraph..."
             document.getElementById('sqlSrvPw2').value = '';
         }
 
-        /* ── University Server Panel ── */
+
+
         let serverConnected = false;
         let serverLog = [];
         let serverIncoming = [];
@@ -9691,6 +10041,7 @@ This is the first paragraph..."
                 <!-- Tab bar -->
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px;">
                     <button id="dhtab-students"    onclick="deptShowTab('students')"    class="btn-feat btn-feat-green" style="font-size:0.78rem; padding:7px 14px;">👤 My Students</button>
+                    <button id="dhtab-courselist"  onclick="deptShowTab('courselist')"  class="btn-feat" style="font-size:0.78rem; padding:7px 14px; border-color:#ff9800; background:#2a1600; color:#ff9800;">📋 Course List</button>
                     <button id="dhtab-grades"      onclick="deptShowTab('grades')"      class="btn-feat" style="font-size:0.78rem; padding:7px 14px; border-color:#00a2ff; background:#003366;">📊 Grades</button>
                     <button id="dhtab-scores"      onclick="deptShowTab('scores')"      class="btn-feat" style="font-size:0.78rem; padding:7px 14px; border-color:#ffae00; background:#3a2800;">📋 Scores</button>
                     <button id="dhtab-submissions" onclick="deptShowTab('submissions')" class="btn-feat" style="font-size:0.78rem; padding:7px 14px; border-color:#81c784; background:#0d2a0d;">📥 Teacher Grades <span id="deptSubBadge" style="display:none; background:#cc0000; color:white; border-radius:10px; padding:1px 7px; font-size:0.72rem; margin-left:4px;"></span></button>
@@ -10697,7 +11048,7 @@ This is the first paragraph..."
     function deptShowTab(tab) {
         _deptActiveTab = tab;
         _deptFCls = ''; _deptFLvl = '';
-        ['students','grades','scores','credits','submissions','examreview','examupload','attendance','comm','password'].forEach(t => {
+        ['students','courselist','grades','scores','credits','submissions','examreview','examupload','attendance','comm','password'].forEach(t => {
             const btn = document.getElementById('dhtab-' + t);
             if (btn) btn.style.opacity = t === tab ? '1' : '0.55';
         });
@@ -10706,6 +11057,8 @@ This is the first paragraph..."
 
         if (tab === 'students') {
             deptRenderStudents(area, dept, '', '', '', '');
+        } else if (tab === 'courselist') {
+            deptRenderCourseList(area, dept, '', '', '', '', []);
         } else if (tab === 'grades') {
             deptRenderSemFiltered(area, dept, gradeData, '#00a2ff', 'Grades', '', '', '', '');
         } else if (tab === 'scores') {
@@ -10760,6 +11113,337 @@ This is the first paragraph..."
             <button onclick="uniSearchOpen()" style="padding:5px 12px;border-radius:6px;border:1.5px solid #00a2ff;background:#001a33;color:#00a2ff;font-size:0.73rem;font-weight:bold;cursor:pointer;text-transform:none;letter-spacing:0;flex:none;display:flex;align-items:center;gap:4px;">🔍 Search by ID</button>
             ${fCls||fYear||fSem||fLvl ? `<span style="color:#00a2ff;font-size:0.73rem;">[${[fCls,fLvl,fYear,fSem].filter(Boolean).join(' › ')}]</span>` : ''}
         </div>`;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       DEPT HEAD — COURSE LIST TAB
+       Displays a student × course-credit-hours table.
+       Filters: Classification · Level · Academic Year · Semester
+       Columns: each Course ID added manually or uploaded via file.
+       Cell values = credit hours from courseCredits[courseId].
+    ══════════════════════════════════════════════════════════════ */
+
+    /* Per-session state for the course list builder */
+    let _clCourseIds  = [];   /* ordered array of course IDs currently in the table */
+
+    function deptRenderCourseList(area, dept, fCls, fLvl, fYear, fSem, courseIds) {
+        fCls = fCls || ''; fLvl = fLvl || ''; fYear = fYear || ''; fSem = fSem || '';
+        _clCourseIds = courseIds && courseIds.length ? [...courseIds] : [..._clCourseIds];
+
+        /* ── Build distinct option lists from this dept's students ── */
+        const myStudents = studentListData.filter(s => s.department === dept);
+        const clsList = ['', ...new Set(myStudents.map(s => s.classification).filter(Boolean))].sort();
+        const lvlList = ['', ...new Set(myStudents.map(s => s.level).filter(Boolean))].sort();
+        const yearList = ['Year 1','Year 2','Year 3','Year 4','Year 5'];
+        const semList  = ['Sem I','Sem II','Sem III'];
+
+        const selStyle = 'padding:6px 10px;border-radius:6px;border:1.5px solid #444;background:#111;color:#fff;font-size:0.78rem;outline:none;cursor:pointer;';
+
+        /* ── Filter bar ── */
+        let html = `
+        <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="color:#ff9800;font-size:0.78rem;font-weight:bold;white-space:nowrap;">🔍 Filter:</span>
+                <select id="clClsSel" style="${selStyle}" onchange="deptFilterCourseList()">
+                    ${clsList.map(c => `<option value="${c}" ${fCls===c?'selected':''}>${c||'— Classification —'}</option>`).join('')}
+                </select>
+                <select id="clLvlSel" style="${selStyle}" onchange="deptFilterCourseList()">
+                    ${lvlList.map(l => `<option value="${l}" ${fLvl===l?'selected':''}>${l||'— Level —'}</option>`).join('')}
+                </select>
+                <select id="clYearSel" style="${selStyle}" onchange="deptFilterCourseList()">
+                    <option value="">— Academic Year —</option>
+                    ${yearList.map(y => `<option value="${y}" ${fYear===y?'selected':''}>${y}</option>`).join('')}
+                </select>
+                <select id="clSemSel" style="${selStyle}" onchange="deptFilterCourseList()">
+                    <option value="">— Semester —</option>
+                    ${semList.map(s => `<option value="${s}" ${fSem===s?'selected':''}>${s}</option>`).join('')}
+                </select>
+                <button onclick="deptClearCourseListFilter()" style="padding:5px 10px;border-radius:6px;border:1px solid #555;background:#333;color:#aaa;font-size:0.73rem;cursor:pointer;text-transform:none;letter-spacing:0;">✕ Clear</button>
+            </div>
+        </div>`;
+
+        /* ── Course ID adder + Upload button ── */
+        html += `
+        <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                <span style="color:#ff9800;font-size:0.78rem;font-weight:bold;white-space:nowrap;">📚 Course IDs:</span>
+                <input id="clCourseIdInput" type="text" placeholder="Enter Course ID…"
+                    style="flex:1;min-width:140px;padding:7px 10px;border-radius:6px;border:1.5px solid #ff9800;background:#0d0900;color:#ff9800;font-size:0.82rem;outline:none;box-sizing:border-box;"
+                    onkeydown="if(event.key==='Enter') deptAddCourseIdToList()">
+                <button onclick="deptAddCourseIdToList()"
+                    style="padding:7px 14px;border-radius:6px;border:1.5px solid #ff9800;background:#2a1600;color:#ff9800;font-size:0.78rem;font-weight:bold;cursor:pointer;white-space:nowrap;text-transform:none;letter-spacing:0;">
+                    ➕ Add Course ID
+                </button>
+                <label style="padding:7px 14px;border-radius:6px;border:1.5px solid #4caf50;background:#071a07;color:#81c784;font-size:0.78rem;font-weight:bold;cursor:pointer;white-space:nowrap;">
+                    📂 Upload Course List
+                    <input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="deptUploadCourseListFile(this)">
+                </label>
+                ${_clCourseIds.length ? `<button onclick="deptClearAllCourseIds()" style="padding:6px 10px;border-radius:6px;border:1px solid #c62828;background:#1a0000;color:#ef9a9a;font-size:0.73rem;cursor:pointer;text-transform:none;letter-spacing:0;">🗑️ Clear All</button>` : ''}
+            </div>`;
+
+        /* Active course ID pills */
+        if (_clCourseIds.length) {
+            html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">`;
+            _clCourseIds.forEach((cid, i) => {
+                html += `<span style="display:inline-flex;align-items:center;gap:5px;background:#1a0d00;border:1px solid #ff9800;border-radius:14px;padding:3px 10px;color:#ff9800;font-size:0.75rem;font-weight:bold;">
+                    ${cid}
+                    <button onclick="deptRemoveCourseId(${i})" style="background:none;border:none;color:#ff5252;cursor:pointer;font-size:0.85rem;padding:0;line-height:1;">×</button>
+                </span>`;
+            });
+            html += `</div>`;
+        } else {
+            html += `<div style="color:#555;font-size:0.75rem;font-style:italic;">No Course IDs added yet. Type a Course ID and click ➕ Add Course ID, or upload a file.</div>`;
+        }
+        html += `</div>`;
+
+        /* ── Notice if filters incomplete — attendance won't auto-register ── */
+        if (_clCourseIds.length && (!fCls || !fLvl || !fYear || !fSem)) {
+            html += `<div style="background:#1a0d00;border:1px solid #ff9800;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:0.78rem;color:#ff9800;">
+                ⚠️ <strong>Select Classification, Level, Academic Year and Semester</strong> above so that Course IDs are automatically registered in Attendance for the matching students.
+                Currently, attendance records will not be created until all four filters are set.
+            </div>`;
+        }
+
+        /* ── Apply student filters ── */
+        let filtered = myStudents;
+        if (fCls)  filtered = filtered.filter(s => s.classification === fCls);
+        if (fLvl)  filtered = filtered.filter(s => s.level === fLvl);
+        if (fYear) filtered = filtered.filter(s => (s.year || s.Year || '') === fYear);
+        if (fSem)  filtered = filtered.filter(s => (s.semester || s.Semester || '') === fSem);
+
+        /* ── Table ── */
+        if (!_clCourseIds.length) {
+            html += `<div style="color:#555;padding:18px;text-align:center;font-size:0.82rem;font-style:italic;">Add Course IDs above to build the table.</div>`;
+        } else if (!filtered.length) {
+            html += `<div style="color:#ffae00;padding:18px;text-align:center;font-size:0.82rem;">⚠ No students match the selected filter.</div>`;
+        } else {
+            /* Print region */
+            html += `<div id="clPrintRegion">`;
+
+            /* Print header (hidden on screen) */
+            html += `<div class="print-only" style="margin-bottom:10px;">
+                <div style="font-weight:bold;font-size:1rem;">Course List — ${dept}</div>
+                <div style="font-size:0.8rem;color:#555;">${[fCls,fLvl,fYear,fSem].filter(Boolean).join(' · ') || 'All Groups'}</div>
+            </div>`;
+
+            html += `<div style="overflow-x:auto;">
+            <table id="clTable" style="width:100%;border-collapse:collapse;font-size:0.78rem;min-width:520px;">
+                <thead>
+                    <tr style="background:#1a0d00;border-bottom:2px solid #ff9800;">
+                        <th style="padding:8px 10px;text-align:left;color:#ff9800;border:1px solid #2a2a2a;white-space:nowrap;position:sticky;left:0;background:#1a0d00;z-index:2;">No.</th>
+                        <th style="padding:8px 10px;text-align:left;color:#ff9800;border:1px solid #2a2a2a;white-space:nowrap;position:sticky;left:32px;background:#1a0d00;z-index:2;">Student ID</th>
+                        <th style="padding:8px 10px;text-align:left;color:#ff9800;border:1px solid #2a2a2a;white-space:nowrap;">Full Name</th>`;
+
+            _clCourseIds.forEach(cid => {
+                const hrs = getCreditHrs(cid);
+                /* Check if attendance record exists for this group + course */
+                const attKey = `${fCls}|${fLvl}|${dept}|${fYear}|${fSem}|${cid}`;
+                const attExists = !!(fCls && fLvl && fYear && fSem && attendanceData[attKey] && attendanceData[attKey].length);
+                const attBadge = attExists
+                    ? `<div style="color:#4caf50;font-size:0.62rem;font-weight:normal;margin-top:2px;">✅ Attendance registered</div>`
+                    : (fCls && fLvl && fYear && fSem
+                        ? `<div style="color:#555;font-size:0.62rem;font-weight:normal;margin-top:2px;">⏳ Will register on add</div>`
+                        : '');
+                html += `<th style="padding:8px 10px;text-align:center;color:#ff9800;border:1px solid #2a2a2a;white-space:nowrap;">
+                    <div>${cid}</div>
+                    <div style="color:#666;font-size:0.68rem;font-weight:normal;">${hrs} cr. hr</div>
+                    ${attBadge}
+                </th>`;
+            });
+
+            /* Total column */
+            html += `<th style="padding:8px 10px;text-align:center;color:#ffd700;border:1px solid #2a2a2a;white-space:nowrap;">Total<br><span style="font-size:0.68rem;font-weight:normal;color:#666;">Cr. Hrs</span></th>`;
+            html += `</tr></thead><tbody>`;
+
+            const totalPerCourse = {};
+            _clCourseIds.forEach(cid => totalPerCourse[cid] = 0);
+            let grandTotal = 0;
+
+            filtered.forEach((s, idx) => {
+                const sid  = s['student id'] || s.studentId || '—';
+                const name = s['full name']  || s.fullName  || s.name || '—';
+                const rowBg = idx % 2 === 0 ? '#0d0900' : '#111';
+                let rowTotal = 0;
+                let cells = '';
+                _clCourseIds.forEach(cid => {
+                    const hrs = getCreditHrs(cid);
+                    totalPerCourse[cid] += hrs;
+                    rowTotal += hrs;
+                    cells += `<td style="padding:7px 10px;text-align:center;border:1px solid #1a1a1a;color:#ff9800;font-weight:bold;">${hrs}</td>`;
+                });
+                grandTotal += rowTotal;
+                html += `<tr style="background:${rowBg};">
+                    <td style="padding:7px 10px;border:1px solid #1a1a1a;color:#555;text-align:center;position:sticky;left:0;background:${rowBg};">${idx+1}</td>
+                    <td style="padding:7px 10px;border:1px solid #1a1a1a;color:#ccc;font-weight:bold;white-space:nowrap;position:sticky;left:32px;background:${rowBg};">${sid}</td>
+                    <td style="padding:7px 10px;border:1px solid #1a1a1a;color:#ddd;white-space:nowrap;">${name}</td>
+                    ${cells}
+                    <td style="padding:7px 10px;text-align:center;border:1px solid #1a1a1a;color:#ffd700;font-weight:bold;">${rowTotal}</td>
+                </tr>`;
+            });
+
+            /* Totals row */
+            html += `<tr style="background:#1a1200;border-top:2px solid #ff9800;font-weight:bold;">
+                <td colspan="3" style="padding:8px 10px;border:1px solid #2a2a2a;color:#ff9800;text-align:right;">Total Credit Hours:</td>`;
+            _clCourseIds.forEach(cid => {
+                html += `<td style="padding:8px 10px;text-align:center;border:1px solid #2a2a2a;color:#ff9800;">${totalPerCourse[cid]}</td>`;
+            });
+            html += `<td style="padding:8px 10px;text-align:center;border:1px solid #2a2a2a;color:#ffd700;">${grandTotal}</td>`;
+            html += `</tr></tbody></table></div>`;
+            html += `</div>`; /* end clPrintRegion */
+
+            /* Print button */
+            const ctx = [fCls,fLvl,dept,fYear,fSem].filter(Boolean).join(' · ');
+            html += `<button onclick="(function(){var pr=document.getElementById('clPrintRegion');if(pr)safePrint('Course List — ${ctx.replace(/'/g,"\\'")}',pr);})()"
+                style="margin-top:12px;padding:7px 18px;background:#1a0d00;color:#ff9800;border:1px solid #ff9800;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:bold;text-transform:none;letter-spacing:0;">
+                🖨️ Print Course List
+            </button>`;
+        }
+
+        area.innerHTML = html;
+    }
+
+    function deptFilterCourseList() {
+        const area = document.getElementById('deptHeadContent');
+        const dept = currentDeptHead ? currentDeptHead.dept : '';
+        const fCls  = (document.getElementById('clClsSel')  || {}).value  || '';
+        const fLvl  = (document.getElementById('clLvlSel')  || {}).value  || '';
+        const fYear = (document.getElementById('clYearSel') || {}).value  || '';
+        const fSem  = (document.getElementById('clSemSel')  || {}).value  || '';
+        deptRenderCourseList(area, dept, fCls, fLvl, fYear, fSem, _clCourseIds);
+    }
+
+    function deptClearCourseListFilter() {
+        const area = document.getElementById('deptHeadContent');
+        const dept = currentDeptHead ? currentDeptHead.dept : '';
+        deptRenderCourseList(area, dept, '', '', '', '', _clCourseIds);
+    }
+
+    /* ── Register course IDs into attendanceData immediately ── */
+    function _clRegisterCoursesInAttendance(courseIds, fCls, fLvl, fYear, fSem) {
+        const dept = currentDeptHead ? currentDeptHead.dept : '';
+        if (!dept) return;
+
+        /* Use current filter values from the selectors if not passed directly */
+        const cls  = fCls  || (document.getElementById('clClsSel')  || {}).value  || '';
+        const lvl  = fLvl  || (document.getElementById('clLvlSel')  || {}).value  || '';
+        const year = fYear || (document.getElementById('clYearSel') || {}).value  || '';
+        const sem  = fSem  || (document.getElementById('clSemSel')  || {}).value  || '';
+
+        /* We need cls/lvl/year/sem to build the attendance key — skip if missing */
+        if (!cls || !lvl || !year || !sem) return;
+
+        const normalize = v => (v || '').toString().trim().toUpperCase();
+        const clsN = normalize(cls), lvlN = normalize(lvl),
+              deptN = normalize(dept), yearN = normalize(year), semN = normalize(sem);
+
+        /* Students that match this group */
+        const groupStudents = studentListData.filter(s =>
+            normalize(s.classification) === clsN &&
+            normalize(s.level)          === lvlN &&
+            normalize(s.department)     === deptN &&
+            normalize(s.year)           === yearN &&
+            normalize(s.semester)       === semN
+        ).map(s => ({
+            sid:  (s['student id'] || s.studentId || '').trim(),
+            name: s['full name']  || s.fullName   || s.name || ''
+        })).filter(s => s.sid);
+
+        if (!groupStudents.length) return;
+
+        let changed = false;
+        courseIds.forEach(cid => {
+            const attKey = `${cls}|${lvl}|${dept}|${year}|${sem}|${cid}`;
+            if (!attendanceData[attKey]) {
+                /* Initialize fresh record for this course */
+                attendanceData[attKey] = groupStudents.map(s => ({ sid: s.sid, name: s.name, dates: {} }));
+                changed = true;
+            } else {
+                /* Merge — add any student not yet in the record */
+                groupStudents.forEach(s => {
+                    if (!attendanceData[attKey].find(r => r.sid === s.sid)) {
+                        attendanceData[attKey].push({ sid: s.sid, name: s.name, dates: {} });
+                        changed = true;
+                    }
+                });
+            }
+        });
+
+        if (changed) {
+            fbSave('hmi_data', 'attendanceData', { data: attendanceData });
+            if (typeof auditLog === 'function') {
+                auditLog('Course List → Attendance',
+                    `Registered ${courseIds.length} course(s) [${courseIds.join(', ')}] for ${cls} · ${lvl} · ${dept} · ${year} · ${sem} — ${groupStudents.length} student(s) enrolled`);
+            }
+        }
+    }
+
+    function deptAddCourseIdToList() {
+        const inp = document.getElementById('clCourseIdInput');
+        const val = (inp ? inp.value.trim().toUpperCase() : '');
+        if (!val) return;
+        if (_clCourseIds.includes(val)) {
+            if (inp) { inp.style.borderColor='#ff5252'; setTimeout(()=>{ if(inp) inp.style.borderColor='#ff9800'; }, 1000); }
+            return;
+        }
+        _clCourseIds.push(val);
+        /* Register immediately in attendanceData */
+        _clRegisterCoursesInAttendance([val]);
+        deptFilterCourseList();
+    }
+
+    function deptRemoveCourseId(idx) {
+        _clCourseIds.splice(idx, 1);
+        deptFilterCourseList();
+    }
+
+    function deptClearAllCourseIds() {
+        _clCourseIds = [];
+        deptFilterCourseList();
+    }
+
+    function deptUploadCourseListFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        const _processHeaders = headers => {
+            const skip = new Set(['STUDENT ID','STUDENT_ID','FULL NAME','FULL_NAME','NAME','NO','NO.','#']);
+            const newIds = headers.filter(h => h && !skip.has(h) && !_clCourseIds.includes(h));
+            newIds.forEach(cid => _clCourseIds.push(cid));
+            /* Register ALL new course IDs at once in one Firebase write */
+            if (newIds.length) _clRegisterCoursesInAttendance(newIds);
+            deptFilterCourseList();
+        };
+
+        if (ext === 'csv') {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const lines = e.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+                if (!lines.length) return;
+                const headers = lines[0].split(',').map(h => h.trim().toUpperCase());
+                _processHeaders(headers);
+            };
+            reader.readAsText(file);
+            return;
+        }
+
+        /* XLSX / XLS */
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const XLSX = window.XLSX;
+                if (!XLSX) { alert('Excel support not loaded. Please use CSV.'); return; }
+                const wb   = XLSX.read(e.target.result, { type: 'array' });
+                const ws   = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                if (!rows.length) return;
+                const headers = (rows[0] || []).map(h => String(h || '').trim().toUpperCase());
+                _processHeaders(headers);
+            } catch(err) {
+                alert('Could not read file: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
     }
 
     /* ── Students tab with year + semester filter ── */
@@ -15143,11 +15827,10 @@ function closeExamBank() {
 function renderExamBankHome() {
     const cv = document.getElementById('examBankContent');
     cv.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;padding-left:80px;">
         <span style="color:#00e5ff;font-weight:bold;font-size:0.9rem;letter-spacing:1px;">🗂️ EXAM BANK</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button onclick="openViewResults()" style="background:linear-gradient(180deg,#003a20,#001a10);color:#4caf50;border:1px solid #2e7d32;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:bold;cursor:pointer;">📊 View Results</button>
-          <button onclick="showAddExamForm()" style="background:linear-gradient(180deg,#003a6a,#001a3a);color:#00e5ff;border:1px solid #00688b;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:bold;cursor:pointer;">＋ Add Exam</button>
         </div>
       </div>
       <!-- Filters -->
@@ -17124,6 +17807,19 @@ async function _finalizeSubmit(studentId, sessionKey, auto) {
    Student logs into Grade Portal and views their exam results
 ══════════════════════════════════════════════════════════════ */
 function openStudentExamResults() {
+    /* ── Check if Results Portal is open ── */
+    if (!window.resultsPortalOpen) {
+        document.getElementById('studentExamResultsOverlay').style.display = 'flex';
+        const cv = document.getElementById('studentExamResultsContent');
+        cv.innerHTML = `
+          <div style="text-align:center;padding:30px 16px;">
+            <div style="font-size:2.2rem;margin-bottom:10px;">🔒</div>
+            <div style="color:#e53935;font-weight:bold;font-size:0.95rem;margin-bottom:8px;">Results Portal is Closed</div>
+            <div style="color:#555;font-size:0.78rem;margin-bottom:20px;">Exam results are not currently available for viewing.<br>Please check back later or contact the Exam Center.</div>
+            <button onclick="closeStudentExamResults()" style="background:#1a0000;color:#ef9a9a;border:1px solid #c62828;border-radius:8px;padding:9px 22px;font-size:0.82rem;cursor:pointer;">Close</button>
+          </div>`;
+        return;
+    }
     document.getElementById('studentExamResultsOverlay').style.display = 'flex';
     const cv = document.getElementById('studentExamResultsContent');
     cv.innerHTML = `
@@ -17484,9 +18180,14 @@ function _vrApply() {
 
 <!-- ═══ EXAM BANK OVERLAY ═══ -->
 <div id="examBankOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;">
-  <div style="background:#060f0f;border:2px solid #00688b;border-radius:14px;width:100%;max-width:600px;padding:18px 16px;box-sizing:border-box;position:relative;margin:auto;">
-    <button onclick="closeExamBank()" style="position:absolute;top:12px;right:12px;background:#001a2a;color:#00e5ff;border:1px solid #00688b;border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer;">✕ Close</button>
+  <div style="background:#060f0f;border:2px solid #00688b;border-radius:14px;width:100%;max-width:600px;padding:18px 16px 72px;box-sizing:border-box;position:relative;margin:auto;">
+    <button onclick="closeExamBank()" style="position:absolute;top:12px;left:12px;background:#001a2a;color:#00e5ff;border:1px solid #00688b;border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer;">✕ Close</button>
     <div id="examBankContent"></div>
+    <!-- ＋ Add Exam — fixed at bottom-right corner of panel -->
+    <button onclick="showAddExamForm()"
+      style="position:sticky;bottom:16px;float:right;margin-top:12px;padding:12px 20px;background:linear-gradient(180deg,#004a8a,#002a5a);color:#00e5ff;border:2px solid #00a8d8;border-radius:50px;font-size:0.88rem;font-weight:bold;cursor:pointer;box-shadow:0 4px 18px rgba(0,180,255,0.35);letter-spacing:0.5px;z-index:10;">
+      ＋ Add Exam
+    </button>
   </div>
 </div>
 
@@ -17520,6 +18221,128 @@ function _vrApply() {
 <div id="studentExamResultsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,5,0,0.95);z-index:9310;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;">
   <div style="background:#050f05;border:2px solid #1a5c20;border-radius:14px;width:100%;max-width:580px;padding:18px 16px;box-sizing:border-box;position:relative;margin:auto;">
     <div id="studentExamResultsContent"></div>
+  </div>
+</div>
+
+<!-- ═══ EXAM CENTER — LOCK PROMPT OVERLAY ═══ -->
+<div id="examCenterPwOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
+  <div style="background:#060f1a;border:2px solid #00688b;border-radius:14px;width:100%;max-width:360px;padding:26px 22px;box-sizing:border-box;text-align:center;position:relative;">
+    <div style="font-size:2rem;margin-bottom:8px;">🔐</div>
+    <div style="color:#00e5ff;font-size:1rem;font-weight:bold;margin-bottom:4px;">Exam Center — Locked</div>
+    <div style="color:#555;font-size:0.78rem;margin-bottom:18px;">Enter the Exam Center password to continue.</div>
+    <input type="password" id="ecpwInput" placeholder="Exam Center password"
+      style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid #00688b;background:#071a2a;color:#fff;font-size:0.92rem;box-sizing:border-box;outline:none;margin-bottom:10px;"
+      onkeydown="if(event.key==='Enter') examCenterPwUnlock()">
+    <div id="ecpwErr" style="min-height:18px;font-size:0.82rem;margin-bottom:12px;color:#ff5252;"></div>
+    <button onclick="examCenterPwUnlock()"
+      style="width:100%;padding:10px;background:#00688b;color:#fff;border:1px solid #00a8d8;border-radius:8px;font-size:0.9rem;font-weight:bold;cursor:pointer;margin-bottom:10px;">
+      🔓 Unlock
+    </button>
+    <button onclick="document.getElementById('examCenterPwOverlay').style.display='none'"
+      style="width:100%;padding:8px;background:transparent;color:#555;border:1px solid #222;border-radius:8px;font-size:0.82rem;cursor:pointer;">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<!-- ═══ EXAM CENTER — PASSWORD MANAGEMENT OVERLAY ═══ -->
+<div id="examCenterMgmtOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;">
+  <div style="background:#060f1a;border:2px solid #00688b;border-radius:14px;width:100%;max-width:440px;padding:22px 20px;box-sizing:border-box;position:relative;margin:auto;">
+    <button onclick="document.getElementById('examCenterMgmtOverlay').style.display='none'"
+      style="position:absolute;top:12px;right:12px;background:#001a2a;color:#00e5ff;border:1px solid #00688b;border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer;">✕ Close</button>
+    <div style="font-size:1.5rem;margin-bottom:6px;">🔑</div>
+    <h3 style="color:#00e5ff;margin:0 0 4px;font-size:0.95rem;letter-spacing:1px;">Exam Center — Password Manager</h3>
+    <div id="ecMgmtStatus" style="font-size:0.78rem;margin-bottom:16px;padding:8px 12px;border-radius:6px;background:#071a07;"></div>
+
+    <!-- Set / Update -->
+    <div id="ecMgmtSetSection">
+      <div id="ecMgmtOldWrap">
+        <label style="color:#aaa;font-size:0.8rem;display:block;margin-bottom:4px;">Current Password</label>
+        <input type="password" id="ecMgmtOld" placeholder="Enter current password"
+          style="width:100%;padding:9px 12px;border-radius:7px;border:1.5px solid #00688b;background:#111;color:#fff;font-size:0.88rem;box-sizing:border-box;outline:none;display:block;margin-bottom:12px;">
+      </div>
+      <label style="color:#aaa;font-size:0.8rem;display:block;margin-bottom:4px;">New Password</label>
+      <input type="password" id="ecMgmtNew1" placeholder="New password (min 6 chars)"
+        style="width:100%;padding:9px 12px;border-radius:7px;border:1.5px solid #00688b;background:#111;color:#fff;font-size:0.88rem;box-sizing:border-box;outline:none;display:block;margin-bottom:10px;">
+      <label style="color:#aaa;font-size:0.8rem;display:block;margin-bottom:4px;">Confirm New Password</label>
+      <input type="password" id="ecMgmtNew2" placeholder="Confirm new password"
+        style="width:100%;padding:9px 12px;border-radius:7px;border:1.5px solid #00688b;background:#111;color:#fff;font-size:0.88rem;box-sizing:border-box;outline:none;display:block;margin-bottom:12px;"
+        onkeydown="if(event.key==='Enter') ecMgmtSave()">
+      <div id="ecMgmtMsg" style="min-height:18px;font-size:0.82rem;margin-bottom:10px;"></div>
+      <button onclick="ecMgmtSave()"
+        style="width:100%;padding:10px;background:#00688b;color:#fff;border:1px solid #00a8d8;border-radius:8px;font-size:0.88rem;font-weight:bold;cursor:pointer;margin-bottom:18px;">
+        💾 Save Password
+      </button>
+    </div>
+
+    <!-- Remove -->
+    <div id="ecMgmtRemoveSection" style="border-top:1px solid #0a2a3a;padding-top:14px;display:none;">
+      <p style="color:#888;font-size:0.75rem;margin:0 0 8px;">⚠️ Remove the password (leaves Exam Center unprotected):</p>
+      <input type="password" id="ecMgmtRemoveConfirm" placeholder="Enter current password to remove"
+        style="width:100%;padding:8px 12px;border-radius:7px;border:1.5px solid #cc0000;background:#111;color:#fff;font-size:0.85rem;box-sizing:border-box;outline:none;display:block;margin-bottom:8px;">
+      <button onclick="ecMgmtRemove()"
+        style="width:100%;padding:9px;background:#2a0000;color:#ff5252;border:1px solid #cc0000;border-radius:8px;font-size:0.82rem;font-weight:bold;cursor:pointer;">
+        🗑️ Remove Password
+      </button>
+      <div id="ecMgmtRemoveMsg" style="min-height:16px;font-size:0.78rem;margin-top:6px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EXAM CENTER — RESULTS PORTAL MANAGEMENT OVERLAY ═══ -->
+<div id="resultsPortalMgmtOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9400;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px;box-sizing:border-box;">
+  <div style="background:#050f05;border:2px solid #2e7d32;border-radius:14px;width:100%;max-width:460px;padding:22px 20px;box-sizing:border-box;position:relative;margin:auto;">
+
+    <button onclick="closeResultsPortalPanel()"
+      style="position:absolute;top:12px;right:12px;background:#001a0a;color:#81c784;border:1px solid #2e7d32;border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer;">✕ Close</button>
+
+    <div style="font-size:1.6rem;margin-bottom:6px;">📊</div>
+    <h3 style="color:#81c784;margin:0 0 4px;font-size:0.95rem;letter-spacing:1px;">Student Results Portal — Access Control</h3>
+    <p style="color:#555;font-size:0.75rem;margin:0 0 14px;">Control whether students can view their exam results. Set a deadline to auto-close the portal.</p>
+
+    <!-- Status banner -->
+    <div id="rpStatus" style="font-size:0.82rem;font-weight:bold;padding:10px 14px;border-radius:8px;margin-bottom:6px;background:#1a0000;color:#e53935;">
+      🔴 CLOSED — Students cannot access results.
+    </div>
+    <div id="rpTimerLine" style="font-size:0.75rem;min-height:18px;margin-bottom:16px;"></div>
+
+    <!-- Deadline option -->
+    <div style="margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#aaa;font-size:0.82rem;margin-bottom:10px;">
+        <input type="checkbox" id="rpUseDeadline" onchange="_rpToggleDeadlineRow()"
+          style="width:16px;height:16px;accent-color:#4caf50;cursor:pointer;">
+        Set auto-close deadline
+      </label>
+      <div id="rpDeadlineRow" style="display:none;margin-left:24px;">
+        <label style="color:#888;font-size:0.75rem;display:block;margin-bottom:4px;">Close portal automatically at:</label>
+        <input type="datetime-local" id="rpDeadlineDt"
+          style="width:100%;max-width:280px;padding:8px 10px;border-radius:7px;border:1.5px solid #2e7d32;background:#071a07;color:#81c784;font-size:0.85rem;box-sizing:border-box;outline:none;">
+      </div>
+    </div>
+
+    <!-- Open / Close buttons -->
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <button id="rpOpenBtn" onclick="rpOpen()"
+        style="flex:1;padding:11px;background:linear-gradient(180deg,#003a20,#001a10);color:#81c784;border:1.5px solid #2e7d32;border-radius:9px;font-size:0.88rem;font-weight:bold;cursor:pointer;">
+        🟢 Open Portal
+      </button>
+      <button id="rpCloseBtn" onclick="rpClose()" disabled
+        style="flex:1;padding:11px;background:linear-gradient(180deg,#2a0000,#1a0000);color:#ef9a9a;border:1.5px solid #c62828;border-radius:9px;font-size:0.88rem;font-weight:bold;cursor:pointer;opacity:0.45;">
+        🔴 Close Portal
+      </button>
+    </div>
+
+    <div id="rpMsg" style="min-height:20px;font-size:0.82rem;margin-top:4px;"></div>
+
+    <!-- Info note -->
+    <div style="margin-top:18px;padding:10px 12px;background:#071a07;border-radius:8px;border:1px solid #0a2a0a;">
+      <div style="color:#555;font-size:0.72rem;line-height:1.6;">
+        ℹ️ When <strong style="color:#81c784;">Open</strong>, students can enter their Student ID on the Exam Results portal to view scores.<br>
+        When <strong style="color:#ef9a9a;">Closed</strong>, the portal shows a "Results not available" message.<br>
+        A deadline automatically closes the portal at the specified time — synced to all devices via Firebase.
+      </div>
+    </div>
+
   </div>
 </div>
 
