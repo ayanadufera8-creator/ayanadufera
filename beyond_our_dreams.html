@@ -1668,11 +1668,11 @@
     <!-- ── HMI BOTTOM NAV ── -->
     <div style="display:flex; flex-direction:column; align-items:stretch; width:100%; box-sizing:border-box;">
         <div class="bottom-nav">
-            <button class="dept-btn" onclick="openSettings()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">⚙<span style="font-size:9px; font-weight:bold;">Settings</span></button>
-            <button class="dept-btn" onclick="showCSDescription()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">🖥️<span style="font-size:9px; font-weight:bold;">Description</span></button>
-            <button class="dept-btn" onclick="openLawModal()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">⚖️<span style="font-size:9px; font-weight:bold;">Rules</span></button>
+            <button class="dept-btn" onclick="openSettings()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#1a0d2e,#0d0619); color:#ce93d8; border-color:#7b1fa2;">⚙<span style="font-size:9px; font-weight:bold;">Settings</span></button>
+            <button class="dept-btn" onclick="showCSDescription()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#1a1200,#0d0900); color:#ffe082; border-color:#f9a825;">🖥️<span style="font-size:9px; font-weight:bold;">Description</span></button>
+            <button class="dept-btn" onclick="openLawModal()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#1a0000,#0d0000); color:#ef9a9a; border-color:#c62828;">⚖️<span style="font-size:9px; font-weight:bold;">Rules</span></button>
 
-            <button class="dept-btn" onclick="loadTier3('P2', document.getElementById('btn-p2-proxy'))" id="btn-p2-proxy" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">🖥️<span style="font-size:9px; font-weight:bold;">Ms Office</span></button>
+            <button class="dept-btn" onclick="loadTier3('P2', document.getElementById('btn-p2-proxy'))" id="btn-p2-proxy" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#001a10,#000d08); color:#80cbc4; border-color:#00796b;">🖥️<span style="font-size:9px; font-weight:bold;">Ms Office</span></button>
             <button class="dept-btn" onclick="launchStudentExamPortal()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#001a2a,#000d1a); color:#00e5ff; border-color:#00688b;">📝<span style="font-size:9px; font-weight:bold;">Exam Portal</span></button>
             <button class="dept-btn" onclick="openStudentExamResults()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#001a0a,#000d06); color:#81c784; border-color:#1a5c20;">📊<span style="font-size:9px; font-weight:bold;">Exam Results</span></button>
             <button class="home-btn" onclick="location.reload()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">🏠<span style="font-size:9px; font-weight:bold;">Home</span></button>
@@ -2532,16 +2532,17 @@
             clearDrillDownRows();
             if(proj === 'System') {
                 const menuItems = [
-                    { label: t('menu-courselist'),  key: 'Course List' },
-                    { label: t('menu-studentlist'), key: 'Student List' },
-                    { label: t('menu-grade'),       key: 'Grade' },
-                    { label: t('menu-portal'),      key: 'Student Grade Portal' },
-                    { label: '📅 Attendance',       key: 'Attendance' }
+                    { label: t('menu-courselist'),  key: 'Course List',         color: '#ffb300', bg: 'linear-gradient(180deg,#2a1c00,#1a1100)', border: '#e65100' },
+                    { label: t('menu-studentlist'), key: 'Student List',        color: '#80deea', bg: 'linear-gradient(180deg,#00252e,#001519)', border: '#00838f' },
+                    { label: t('menu-grade'),       key: 'Grade',              color: '#a5d6a7', bg: 'linear-gradient(180deg,#0d2b0d,#061806)', border: '#2e7d32' },
+                    { label: t('menu-portal'),      key: 'Student Grade Portal', color: '#ce93d8', bg: 'linear-gradient(180deg,#1a0d2e,#0d0619)', border: '#7b1fa2' },
+                    { label: '📅 Attendance',       key: 'Attendance',         color: '#26c6da', bg: 'linear-gradient(180deg,#003a40,#001f24)', border: '#00838f' }
                 ];
                 menuItems.forEach(item => {
                     let b = document.createElement('button');
                     b.innerText = item.label;
                     b.setAttribute('data-menu-key', item.key);
+                    b.style.cssText = `background:${item.bg};color:${item.color};border-color:${item.border};`;
                     b.onclick = () => loadContent(item.key, b);
                     document.getElementById('tier-3').appendChild(b);
                 });
