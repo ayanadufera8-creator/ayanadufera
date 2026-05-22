@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title id="sysTitle">BODU Relational HMI System v74.3</title>
+    <title id="sysTitle">BODU Relational HMI System v75.0</title>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -51,7 +51,7 @@
         window.pendingExamSubmissions = window.pendingExamSubmissions || [];
 
         /* Change only this one line to update the version everywhere */
-        window.SYSTEM_VERSION = 'v74.3';
+        window.SYSTEM_VERSION = 'v75.0';
 
 
         /* ── SHA-256 Password Hashing ── */
@@ -1601,14 +1601,20 @@
         }
         /* Hide the Google logo text */
         #google_translate_element .goog-te-gadget-simple img { display: none !important; }
+        /* Force button label to English regardless of page content language */
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child { font-size: 0 !important; }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child::after { content: 'Select Language'; font-size: 10px !important; color: #fff !important; font-weight: bold; }
         .goog-te-gadget { font-size: 0 !important; }
         .goog-te-gadget > span > a { display: none !important; }
     </style>
     <script type="text/javascript">
         /* Force English as default — clear any saved Google Translate cookie */
         (function() {
-            document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-            document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + location.hostname;
+            var exp = 'expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
+            document.cookie = 'googtrans=; ' + exp + ';';
+            document.cookie = 'googtrans=; ' + exp + '; domain=' + location.hostname;
+            document.cookie = 'googtrans=; ' + exp + '; domain=.' + location.hostname;
+            try { localStorage.removeItem('googtrans'); } catch(e) {}
         })();
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
@@ -1618,6 +1624,20 @@
                 autoDisplay: false,
                 multilanguagePage: true
             }, 'google_translate_element');
+            /* Force button label back to "Select Language" and reset to English */
+            setTimeout(function forceLangLabel() {
+                const span = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
+                if (span) {
+                    span.textContent = 'Select Language';
+                } else {
+                    setTimeout(forceLangLabel, 300);
+                }
+                const sel = document.querySelector('.goog-te-combo');
+                if (sel && sel.value !== '' && sel.value !== 'en') {
+                    sel.value = 'en';
+                    sel.dispatchEvent(new Event('change'));
+                }
+            }, 600);
         }
     </script>
     <script type="text/javascript"
@@ -1626,24 +1646,27 @@
 
     <script>
         window.addEventListener('DOMContentLoaded', function() {
-            const ver = window.SYSTEM_VERSION || 'v64.0';
+            const ver = window.SYSTEM_VERSION || 'v75.0';
             document.querySelectorAll('.sysver').forEach(el => el.textContent = ver);
             const t = document.getElementById('sysTitle');
             if (t) t.textContent = 'BODU Relational HMI System ' + ver;
 
             /* Force English default on every page load */
             setTimeout(function() {
-                var selectEl = document.querySelector('.goog-te-combo');
-                if (selectEl) {
-                    selectEl.value = 'en';
-                    selectEl.dispatchEvent(new Event('change'));
-                }
                 var domains = [location.hostname, '.' + location.hostname];
                 domains.forEach(function(d) {
                     document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + d;
-                    document.cookie = 'googtrans=/en/en; path=/; domain=' + d;
                 });
-            }, 1000);
+                try { localStorage.removeItem('googtrans'); } catch(e) {}
+                var selectEl = document.querySelector('.goog-te-combo');
+                if (selectEl && selectEl.value !== '' && selectEl.value !== 'en') {
+                    selectEl.value = 'en';
+                    selectEl.dispatchEvent(new Event('change'));
+                }
+                /* Restore label to "Select Language" */
+                var span = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
+                if (span) span.textContent = 'Select Language';
+            }, 1200);
         });
 
         /* ── GLOBAL: Grade/Score column order ──
@@ -1670,14 +1693,19 @@
 </head>
 <body>
 
+    <!-- ── TOP BAR: LIVE CLOCK (left) + GOOGLE TRANSLATE (right) ── -->
+    <div style="position:relative; z-index:100; background:#0a0a0a; border-bottom:1px solid #222; padding:3px 10px; display:flex; justify-content:space-between; align-items:center; width:100%; box-sizing:border-box; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span id="liveDate"  style="color:#888; font-size:10px; font-family:'Segoe UI',monospace; letter-spacing:0.3px;"></span>
+            <span id="liveClock" style="color:#00a2ff; font-size:11px; font-weight:bold; font-family:'Segoe UI',monospace; letter-spacing:1px;"></span>
+        </div>
+        <div id="google_translate_element"></div>
+    </div>
+
     <!-- ── HMI TOP HEADER ── -->
     <div class="top-header" style="background:#d0d0d0; border-bottom:2px solid #aaa; padding:0; position:relative; overflow:hidden; box-sizing:border-box; width:100%; height:65px; display:flex; align-items:center; justify-content:center;">
 
-        <!-- Language button + Google Translate — absolute top right -->
-        <div style="position:absolute;top:4px;right:6px;z-index:30;display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
 
-            <div id="google_translate_element"></div>
-        </div>
 
         <!-- SVG Ribbon — full width, wavy like image -->
         <svg id="main-title" viewBox="0 0 800 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"
@@ -1896,11 +1924,7 @@
             <button class="dept-btn" onclick="openStudentExamResults()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#001a0a,#000d06); color:#81c784; border-color:#1a5c20;">📊<span style="font-size:9px; font-weight:bold;">Exam Results</span></button>
             <button class="home-btn" onclick="location.reload()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">🏠<span style="font-size:9px; font-weight:bold;">Home</span></button>
         </div>
-        <!-- ── LIVE CLOCK ── -->
-        <div style="background:#111; border-top:1px solid #222; padding:3px 10px 4px; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
-            <span id="liveDate"  style="color:#555; font-size:10px; font-family:'Segoe UI',monospace;"></span>
-            <span id="liveClock" style="color:#00a2ff; font-size:11px; font-weight:bold; font-family:'Segoe UI',monospace; letter-spacing:0.5px;"></span>
-        </div>
+
     </div>
 
     <!-- ── PORTAL OVERLAY (embedded, no iframe) ── -->
@@ -1918,7 +1942,7 @@
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
                         <span style="font-size:2rem;">🖥️</span>
                         <div>
-                            <h1 style="color:#2c3e50; font-size:1.3rem; margin:0; border-bottom:2px solid #2c3e50; padding-bottom:4px;">BODU Relational HMI System <span class="sysver">v64.0</span></h1>
+                            <h1 style="color:#2c3e50; font-size:1.3rem; margin:0; border-bottom:2px solid #2c3e50; padding-bottom:4px;">BODU Relational HMI System <span class="sysver">v75.0</span></h1>
                             <p style="color:#888; font-size:0.75rem; margin:4px 0 0;">System Documentation — Beyond Our Dreams University, Bishoftu Campus</p>
                         </div>
                     </div>
@@ -1929,7 +1953,7 @@
                         <!-- 1. What Is This System -->
                         <div style="background:#f7f7f7; border-left:5px solid #f0b429; border-radius:6px; padding:14px 16px;">
                             <div style="color:#b8860b; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🏫 1. What Is This System?</div>
-                            <p style="color:#333; margin:0 0 8px;">The <strong>BODU Relational HMI System</strong> (v64.0) is a comprehensive, cloud-connected academic management platform for <strong>Beyond Our Dreams University (BODU), Bishoftu Campus</strong>. It manages the complete student lifecycle — from registration and fee payment through grade management, attendance tracking, GPA reporting, multi-role administration, and department head review workflows.</p>
+                            <p style="color:#333; margin:0 0 8px;">The <strong>BODU Relational HMI System</strong> (v75.0) is a comprehensive, cloud-connected academic management platform for <strong>Beyond Our Dreams University (BODU), Bishoftu Campus</strong>. It manages the complete student lifecycle — from registration and fee payment through grade management, attendance tracking, GPA reporting, multi-role administration, and department head review workflows.</p>
                             <ul style="color:#444; margin:0; padding-left:18px;">
                                 <li>Powered by <strong>Firebase Firestore</strong> for real-time cloud sync across all staff sessions simultaneously — no page refresh needed.</li>
                                 <li>All financial figures are in <strong>ETB (Ethiopian Birr)</strong>.</li>
@@ -2042,7 +2066,7 @@
 
                         <!-- Footer -->
                         <div style="text-align:center; color:#888; font-size:0.75rem; border-top:1px solid #ddd; padding-top:14px;">
-                            <strong>Version <span class="sysver">v64.0</span></strong> &nbsp;|&nbsp; Developed by <strong>Ayana Dufera</strong> &nbsp;|&nbsp; © 2026 BODU Bishoftu Campus. All rights reserved.
+                            <strong>Version <span class="sysver">v75.0</span></strong> &nbsp;|&nbsp; Developed by <strong>Ayana Dufera</strong> &nbsp;|&nbsp; © 2026 BODU Bishoftu Campus. All rights reserved.
                         </div>
 
                     </div>
@@ -4674,7 +4698,7 @@
                         <span style="font-size:2rem;">🖥️</span>
                         <div>
                             <h2 style="color:#ffd700; margin:0; font-size:1.15rem; letter-spacing:1px;">BODU RELATIONAL HMI SYSTEM</h2>
-                            <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">System Overview &amp; Documentation — <span class="sysver">v64.0</span></p>
+                            <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">System Overview &amp; Documentation — <span class="sysver">v75.0</span></p>
                         </div>
                     </div>
                     <hr style="border-color:#333; margin:14px 0 20px;">
@@ -4767,7 +4791,7 @@
                         <div style="background:#1a1a1a; border-left:4px solid #555; border-radius:6px; padding:12px 16px; text-align:center;">
                             <p style="color:#888; font-size:0.78rem; margin:0;">
                                 Developed by <strong style="color:#ccc;">Ayana Dufera</strong> &nbsp;|&nbsp;
-                                Version <strong style="color:#ffd700;"><span class="sysver">v64.0</span></strong> &nbsp;|&nbsp;
+                                Version <strong style="color:#ffd700;"><span class="sysver">v75.0</span></strong> &nbsp;|&nbsp;
                                 © 2026 BODU Bishoftu Campus &nbsp;|&nbsp; All rights reserved.<br>
                                 <span style="font-size:0.72rem; color:#555;">Firebase: <code>rvu-hmi-system</code> &nbsp;|&nbsp; Built with HTML5, CSS3, Vanilla JS, Firebase Firestore, SheetJS</span>
                             </p>
@@ -5419,7 +5443,7 @@
                 <span style="font-size:2rem;">⚖️</span>
                 <div>
                     <h2 style="color:#ffd700; margin:0; font-size:1.2rem; letter-spacing:1px;">TERMS OF USE &amp; USER RULES</h2>
-                    <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">BODU Relational HMI System — <span class="sysver">v64.0</span></p>
+                    <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">BODU Relational HMI System — <span class="sysver">v75.0</span></p>
                 </div>
                 <button onclick="closeLawModal()" style="position:absolute; top:16px; right:16px; background:#cc0000; color:white; border:none; padding:7px 16px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">✕ CLOSE</button>
             </div>
@@ -5430,85 +5454,105 @@
 
                 <!-- 1 -->
                 <div style="background:#252525; border-left:4px solid #ffd700; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#ffd700; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">📋 1. Authorised Use Only</div>
+                    <div style="color:#ffd700; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">📋 1. Authorised Use &amp; Role Access</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
                         <li>This system is exclusively for <strong style="color:#fff;">registered students and authorised staff</strong> of Beyond Our Dreams University, Bishoftu Campus.</li>
-                        <li>Access is granted by role (Admin, Registrar, Cashier, Finance Head, Dept Head, Teacher, Student, Server Access). Using another person's credentials to access a role above your own is strictly prohibited.</li>
-                        <li>Access by completely unauthorised persons may be subject to disciplinary or legal action under applicable Ethiopian law.</li>
-                        <li>Each user is personally responsible for keeping their Student ID and role credentials confidential. Do not write passwords down or share them.</li>
+                        <li>Access is role-gated by password: <strong style="color:#fff;">Admin, Registrar, Cashier, Finance Head, Dept Head, Teacher, Student (Student ID), Server Access.</strong> Using another person's credentials or attempting to access a role above your own is strictly prohibited.</li>
+                        <li>All role passwords are stored as <strong style="color:#fff;">SHA-256 hashes</strong> in Firebase. Plain-text passwords are automatically migrated on first load. Never share your password verbally or in writing.</li>
+                        <li>Unauthorised access may be subject to disciplinary or legal action under applicable Ethiopian law. Every login action is recorded in the <strong style="color:#fff;">Audit Log</strong>.</li>
                     </ul>
                 </div>
 
                 <!-- 2 -->
                 <div style="background:#252525; border-left:4px solid #00a2ff; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#00a2ff; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🔐 2. Administrator &amp; Staff Responsibilities</div>
+                    <div style="color:#00a2ff; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🔐 2. Role Responsibilities</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li><strong style="color:#fff;">Admin:</strong> Responsible for all system-level changes — grade scale, fee structures, staff passwords, and database integrity. Changes made under the Admin account are permanent and fully audited.</li>
-                        <li><strong style="color:#fff;">Registrar:</strong> Responsible for department permission accuracy, upload deadlines, and committing only Dept Head-approved grades to the live database.</li>
-                        <li><strong style="color:#fff;">Finance Head / Cashier:</strong> Responsible for the accuracy of fee configurations and payment records. No fee amount may be manually altered after a payment is approved.</li>
-                        <li><strong style="color:#fff;">Dept Head:</strong> Must review teacher submissions carefully before approval. Approving inaccurate grades is a disciplinary matter.</li>
-                        <li><strong style="color:#fff;">Teacher:</strong> Uploads must reflect actual assessed scores only. Submitting falsified Score or Grade files is a serious academic integrity violation.</li>
-                        <li>All role passwords must be changed immediately if a security breach is suspected. Use Admin → Settings to update.</li>
+                        <li><strong style="color:#fff;">Admin:</strong> Full system control — grade scale configuration, fee structure management, course credits, student data upload, all passwords, audit log access, database JSON export/backup, and academic calendar settings (years, semesters, curriculum).</li>
+                        <li><strong style="color:#fff;">Registrar:</strong> Manages department-level grade upload permissions and deadlines, attendance password, student registration permissions (new intake &amp; re-registration), new/old student registration deadlines, and commits Dept Head-approved grades to the live database. Also manages messages and the permission matrix.</li>
+                        <li><strong style="color:#fff;">Finance Head:</strong> Reviews all payment ledger records, fee type configurations, and financial reports. No fee amount may be altered after a payment is approved.</li>
+                        <li><strong style="color:#fff;">Cashier:</strong> Searches students by ID, views fee clearance status, and records individual fee payments. Cannot alter fee type configurations.</li>
+                        <li><strong style="color:#fff;">Dept Head:</strong> Reviews teacher Score &amp; Grade submissions for their department, approves or rejects uploads, manages the department exam bank, and sets per-department exam attendance thresholds. Must complete review within the Registrar's open window.</li>
+                        <li><strong style="color:#fff;">Teacher:</strong> Uploads Score File (A) and Grade File (B) for their assigned courses. Both files must be submitted in a single cycle. Submitting falsified data is a serious academic integrity violation.</li>
+                        <li><strong style="color:#fff;">Student:</strong> Accesses the Student Grade Portal using their registered Student ID to view GPA results by academic year and semester, and to submit payment requests for their own fees only.</li>
                     </ul>
                 </div>
 
                 <!-- 3 -->
                 <div style="background:#252525; border-left:4px solid #4caf50; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#4caf50; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🎓 3. Student Usage Guidelines</div>
+                    <div style="color:#4caf50; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🎓 3. General System — Data Viewing Rules</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>Students may only view their <strong style="color:#fff;">own</strong> academic records using their registered Student ID.</li>
-                        <li>Attempting to access, alter, or view another student's data is a <strong style="color:#e57373;">serious disciplinary violation</strong>.</li>
-                        <li>Grades displayed in this portal are for informational purposes only. For official, certified records contact the Registrar's Office directly.</li>
-                        <li>Printed GPA reports generated by this system carry a verification code but are <strong style="color:#fff;">not official documents</strong> unless physically stamped and signed by the Registrar.</li>
-                        <li>Payment requests submitted through the Student portal must be for the student's own fees only. Fraudulent requests will result in disciplinary action.</li>
-                        <li>Registration (new intake or re-registration) must be completed through the Registration panel; self-editing of student records is not permitted.</li>
+                        <li>The <strong style="color:#fff;">General System</strong> panel provides access to: Score (Course List), Student List, Grade Table, Credits, and the Student Grade Portal. Data is filtered by Academic Year → Semester → Class → Level → Department.</li>
+                        <li>The <strong style="color:#fff;">Score</strong> tab displays uploaded course score data per class, level, and department. Only Admin can view all data without a role filter.</li>
+                        <li>The <strong style="color:#fff;">Student List</strong> tab shows registered students. Admin can add course credits and edit academic configuration. Dept Head and Teacher views are filtered to their department.</li>
+                        <li>The <strong style="color:#fff;">Grade</strong> tab shows committed grade data. Admin can view and print full tables. Dept Head and Teacher views are scoped to their department.</li>
+                        <li>The <strong style="color:#fff;">Attendance</strong> tab is protected by a dedicated attendance password set by the Registrar. Attendance records are stored per course, class, level, department, year, and semester.</li>
+                        <li>The <strong style="color:#fff;">Student Grade Portal</strong> allows any visitor to look up their own GPA results using only their Student ID. Printed GPA reports carry a unique verification code — they are <strong style="color:#fff;">not official documents</strong> unless physically stamped and signed by the Registrar.</li>
                     </ul>
                 </div>
 
                 <!-- 4 -->
                 <div style="background:#252525; border-left:4px solid #ce93d8; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#ce93d8; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🚫 4. Prohibited Actions</div>
+                    <div style="color:#ce93d8; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🏛️ 4. Registration Rules</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>Do <strong style="color:#e57373;">not</strong> attempt to reverse-engineer, decompile, modify, or tamper with the system's HTML, JavaScript, or Firebase rules.</li>
-                        <li>Do <strong style="color:#e57373;">not</strong> upload falsified, altered, or manipulated Score or Grade files.</li>
-                        <li>Do <strong style="color:#e57373;">not</strong> share, photograph, screenshot, publish, or distribute another student's academic records.</li>
-                        <li>Do <strong style="color:#e57373;">not</strong> use this system for any purpose outside its intended academic administration function.</li>
-                        <li>Do <strong style="color:#e57373;">not</strong> attempt to delete or alter the Audit Log — it is read-only for all roles including Admin.</li>
-                        <li>Do <strong style="color:#e57373;">not</strong> export or distribute the full database JSON backup beyond authorised technical personnel.</li>
+                        <li>New student registration is only open when the Registrar has enabled it and the registration deadline has not passed. The system enforces this automatically.</li>
+                        <li>Old student re-registration requires payment clearance. Students blocked by the Cashier cannot complete re-registration until their fees are settled.</li>
+                        <li>Each student may register only <strong style="color:#fff;">once per semester</strong>. Duplicate registrations within the same semester are rejected by the system.</li>
+                        <li>Re-registration eligibility criteria (minimum GPA, maximum failed subjects, and class assignment) are configured by the Registrar and enforced automatically.</li>
+                        <li>Students must not attempt to alter their own registration records. All self-editing is blocked — modifications must go through the Registrar's office.</li>
+                        <li>The <strong style="color:#fff;">Database tab</strong> (Admin/Registrar only) provides an SQL-style viewer of all Firebase collections. No data may be exported, shared, or published beyond authorised technical personnel.</li>
                     </ul>
                 </div>
 
                 <!-- 5 -->
                 <div style="background:#252525; border-left:4px solid #ffae00; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#ffae00; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🖨️ 5. Printed Documents &amp; Verification</div>
+                    <div style="color:#ffae00; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">📝 5. Grade Upload &amp; Exam Center Rules</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>GPA result printouts generated by this system are for <strong style="color:#fff;">personal reference only</strong> until physically stamped by the Registrar.</li>
-                        <li>Each printed report contains a unique <strong style="color:#fff;">verification code</strong> that can be authenticated at the Registrar's Office. Altering or removing this code is prohibited.</li>
-                        <li>No system output (grade tables, attendance records, payment receipts) may be reproduced or submitted as an official document without the Registrar's written authorisation.</li>
-                        <li>The BODU seal, signature line, and watermark embedded in reports are for integrity assurance — digitally or physically altering them is a forgery offence.</li>
+                        <li>Grade uploads are only accepted when the Registrar has explicitly granted permission for a department. Per-department deadlines are enforced automatically — late uploads are rejected.</li>
+                        <li>Teachers must complete both Score File (A) and Grade File (B) in a single submission cycle. Partial uploads are not forwarded to the Dept Head for review.</li>
+                        <li>Dept Heads must review and approve or reject teacher submissions within the open window. Delayed approvals causing grade unavailability are the Dept Head's responsibility.</li>
+                        <li>The <strong style="color:#fff;">Exam Center</strong> is password-protected. The Dept Head manages the Exam Bank (question sets per course), opens/closes live exam sessions, and sets the minimum attendance threshold required for a student to sit an exam.</li>
+                        <li>Students who do not meet the attendance threshold for a course are blocked from accessing that exam — this is enforced automatically by the system.</li>
+                        <li>Exam results published through the Exam Center are visible to students via the <strong style="color:#fff;">Exam Results portal</strong>. The Dept Head controls whether results are open or closed for student viewing.</li>
+                        <li>Uploading falsified, manipulated, or altered Score, Grade, or Exam files is a serious academic integrity violation and will be recorded in the Audit Log.</li>
                     </ul>
                 </div>
 
                 <!-- 6 -->
                 <div style="background:#252525; border-left:4px solid #26c6da; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#26c6da; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🔄 6. Grade Upload &amp; Deadline Rules</div>
+                    <div style="color:#26c6da; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🖨️ 6. Printed Documents, Verification &amp; Audit</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>Grade uploads are only open when the Registrar has explicitly enabled the permission for a department. Attempting to bypass this control is prohibited.</li>
-                        <li>Per-department upload deadlines set by the Registrar are enforced automatically by the system. Late submissions will not be accepted after the deadline.</li>
-                        <li>Teachers must complete both Score File (A) and Grade File (B) uploads in a single submission cycle. Partial uploads will not be forwarded to the Dept Head.</li>
-                        <li>Dept Heads must complete their review and approval within the open window. Delayed reviews that cause student grade unavailability are the Dept Head's responsibility.</li>
+                        <li>All printed outputs (GPA reports, grade tables, attendance sheets, score lists) generated by this system carry the BODU seal, a date/time stamp, and a unique <strong style="color:#fff;">verification code</strong>. Altering or removing any of these elements is a forgery offence.</li>
+                        <li>Verification codes on GPA printouts can be authenticated at the Registrar's Office. Printed reports are for personal reference only until physically stamped and signed by the Registrar.</li>
+                        <li>No system output may be reproduced or submitted as an official document without the Registrar's written authorisation.</li>
+                        <li>Every significant action in the system (logins, uploads, approvals, rejections, data changes, exports) is recorded in the <strong style="color:#fff;">Audit Log</strong>. The Audit Log is read-only for all roles including Admin — it cannot be deleted or altered.</li>
+                        <li>The database JSON export/backup feature (Admin only) must not be distributed beyond authorised technical personnel. The export filename includes the system version for traceability.</li>
                     </ul>
                 </div>
 
                 <!-- 7 -->
                 <div style="background:#252525; border-left:4px solid #e57373; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#e57373; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">⚠️ 7. Disclaimer &amp; Liability</div>
+                    <div style="color:#e57373; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🚫 7. Prohibited Actions</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>This system runs entirely in the browser and syncs data live via Firebase Firestore. Internet connectivity is required for all data operations.</li>
-                        <li>The university is not liable for decisions made solely on the basis of data viewed in this portal. Always verify critical information with the Registrar's Office.</li>
-                        <li>For grade disputes or correction requests, contact your department instructor or the Registrar's Office directly — do not attempt to edit records yourself.</li>
-                        <li>BODU and the system developer accept no liability for data loss resulting from browser clearing, device failure, or network interruption during an upload session.</li>
-                        <li>System availability is subject to Firebase service uptime. Planned maintenance windows will be communicated by the Registrar's Office.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> attempt to reverse-engineer, decompile, modify, or tamper with the system's HTML, JavaScript, or Firebase security rules.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> upload falsified, altered, or manipulated Score, Grade, Student List, or Exam files.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> share, photograph, screenshot, publish, or distribute another student's academic, financial, or personal records.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> use the Database viewer, JSON export, or any admin tool for any purpose outside authorised academic administration.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> attempt to bypass the attendance threshold check to gain access to an exam session you are ineligible for.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> submit a payment request for another student's fees or attempt to manipulate the payment ledger or clearance status.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> attempt to alter or delete the Audit Log — it is permanently read-only for all roles.</li>
+                    </ul>
+                </div>
+
+                <!-- 8 -->
+                <div style="background:#252525; border-left:4px solid #ef9a9a; border-radius:6px; padding:14px 16px;">
+                    <div style="color:#ef9a9a; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">⚠️ 8. Disclaimer &amp; Liability</div>
+                    <ul style="color:#ccc; margin:0; padding-left:18px;">
+                        <li>This system runs entirely in the browser and syncs data live with <strong style="color:#fff;">Firebase Firestore</strong>. A stable internet connection is required for all data operations — uploads, saves, and real-time sync.</li>
+                        <li>BODU and the system developer accept no liability for data loss resulting from browser clearing, device failure, or network interruption during an active upload or save session.</li>
+                        <li>Data displayed in this system is for informational purposes. Always verify critical academic, financial, or registration decisions with the Registrar's Office directly.</li>
+                        <li>For grade disputes or correction requests, contact your department instructor or the Registrar's Office — do not attempt to alter records yourself.</li>
+                        <li>System availability is subject to Firebase service uptime. Planned maintenance windows will be communicated by the Registrar's Office in advance.</li>
+                        <li>The Google Translate feature is provided for accessibility only. The English content is the authoritative version of all system text, rules, and instructions.</li>
                     </ul>
                 </div>
 
@@ -5517,7 +5561,7 @@
             <!-- Footer -->
             <div style="margin-top:22px; text-align:center; color:#666; font-size:0.72rem; border-top:1px solid #333; padding-top:14px;">
                 By using this system you acknowledge that you have read, understood, and agreed to all rules above.<br>
-                <strong style="color:#888;">© 2026 BODU Relational HMI System v64.0 — Developed by Ayana Dufera — All rights reserved.</strong>
+                <strong style="color:#888;">© 2026 BODU Relational HMI System v75.0 — Developed by Ayana Dufera — All rights reserved.</strong>
             </div>
 
         </div>
