@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title id="sysTitle">BODU Relational HMI System v74.3</title>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -146,18 +146,78 @@
 
         /* Grade scale defaults — overwritten by Firebase on load */
         window.GRADE_SCALE = window.GRADE_SCALE || { Aplus:90, A:83, Bplus:75, B:68, Cplus:60, C:50, D:40 };
+        window.curriculumMap = window.curriculumMap || {};  /* populated from Firebase */
+        window.courseNames   = window.courseNames   || {};  /* populated from Firebase */
+        window.academicYears = window.academicYears || ["Year 1","Year 2","Year 3","Year 4","Year 5"];
+        window.semesters     = window.semesters     || ["Sem I","Sem II","Sem III"];
+
+        /* ── Sharding helpers ── */
+        const _SHARD_LEVELS = ['Diploma','Degree','Masters','PhD'];
+
+        /* Extract level from a student row — works for both studentList and registrationDB rows */
+        function _studentLevel(row) { return (row.level || row.Level || '').trim() || 'Degree'; }
+
+        /* Merge sharded studentList docs back into the in-memory array */
+        function _mergeStudentShards(shards) {
+            if (typeof studentListData === 'undefined') return;
+            studentListData.length = 0;
+            shards.forEach(s => { if (s && s.data) s.data.forEach(r => studentListData.push(r)); });
+        }
+
+        /* Merge sharded object docs (gradeData / courseScoreData / attendanceData) */
+        function _mergeObjShards(target, shards) {
+            if (typeof target === 'undefined') return;
+            shards.forEach(s => { if (s && s.data) Object.assign(target, s.data); });
+        }
 
         async function fbLoadAll() {
             showSyncStatus('\u23f3 Loading from cloud\u2026', '#ffae00');
             try {
-                const sl = await fbLoad('hmi_data', 'studentList');
-                if (sl && sl.data && typeof studentListData !== 'undefined') { studentListData.length = 0; sl.data.forEach(r => studentListData.push(r)); }
+                /* ── studentList — load all 4 level shards in parallel ── */
+                const slShards = await Promise.all(_SHARD_LEVELS.map(lvl => fbLoad('hmi_data', 'studentList_' + lvl)));
+                /* Fallback: if shards are all missing, try legacy single doc (migration path) */
+                const slAnyExists = slShards.some(s => s !== undefined && s !== null);
+                if (slAnyExists) {
+                    _mergeStudentShards(slShards);
+                } else {
+                    const slLegacy = await fbLoad('hmi_data', 'studentList');
+                    if (slLegacy && slLegacy.data && typeof studentListData !== 'undefined') {
+                        studentListData.length = 0; slLegacy.data.forEach(r => studentListData.push(r));
+                        /* Auto-migrate: save sharded immediately */
+                        await fbSaveStudentListSharded();
+                        console.log('HMI: studentList migrated to sharded docs.');
+                    }
+                }
 
-                const gd = await fbLoad('hmi_data', 'gradeData');
-                if (gd && gd.data && typeof gradeData !== 'undefined') Object.assign(gradeData, gd.data);
+                /* ── gradeData — load all 4 level shards in parallel ── */
+                const gdShards = await Promise.all(_SHARD_LEVELS.map(lvl => fbLoad('hmi_data', 'gradeData_' + lvl)));
+                const gdAnyExists = gdShards.some(s => s !== undefined && s !== null);
+                if (gdAnyExists) {
+                    if (typeof gradeData !== 'undefined') { Object.keys(gradeData).forEach(k => delete gradeData[k]); }
+                    _mergeObjShards(gradeData, gdShards);
+                } else {
+                    const gdLegacy = await fbLoad('hmi_data', 'gradeData');
+                    if (gdLegacy && gdLegacy.data && typeof gradeData !== 'undefined') {
+                        Object.assign(gradeData, gdLegacy.data);
+                        await fbSaveGradeDataSharded();
+                        console.log('HMI: gradeData migrated to sharded docs.');
+                    }
+                }
 
-                const cs = await fbLoad('hmi_data', 'courseScoreData');
-                if (cs && cs.data && typeof courseScoreData !== 'undefined') Object.assign(courseScoreData, cs.data);
+                /* ── courseScoreData — load all 4 level shards in parallel ── */
+                const csShards = await Promise.all(_SHARD_LEVELS.map(lvl => fbLoad('hmi_data', 'courseScoreData_' + lvl)));
+                const csAnyExists = csShards.some(s => s !== undefined && s !== null);
+                if (csAnyExists) {
+                    if (typeof courseScoreData !== 'undefined') { Object.keys(courseScoreData).forEach(k => delete courseScoreData[k]); }
+                    _mergeObjShards(courseScoreData, csShards);
+                } else {
+                    const csLegacy = await fbLoad('hmi_data', 'courseScoreData');
+                    if (csLegacy && csLegacy.data && typeof courseScoreData !== 'undefined') {
+                        Object.assign(courseScoreData, csLegacy.data);
+                        await fbSaveScoreDataSharded();
+                        console.log('HMI: courseScoreData migrated to sharded docs.');
+                    }
+                }
 
                 const pl = await fbLoad('hmi_data', 'paymentLedger');
                 if (pl && pl.data && typeof paymentLedger !== 'undefined') { paymentLedger.length = 0; pl.data.forEach(r => paymentLedger.push(r)); }
@@ -165,14 +225,27 @@
                 const sp = await fbLoad('hmi_data', 'studentPaymentReqs');
                 if (sp && sp.data && typeof studentPaymentRequests !== 'undefined') { studentPaymentRequests.length = 0; sp.data.forEach(r => studentPaymentRequests.push(r)); }
 
-                const rd = await fbLoad('hmi_data', 'registrationDB');
-                if (rd && rd.data) {
-                    Object.assign(registrationDB, rd.data);
-                } else if (rd === undefined) {
-                    /* First run — seed registrationDB from defaults and save to Firebase */
-                    Object.assign(registrationDB, _REG_DB_SEED);
-                    await fbSave('hmi_data', 'registrationDB', { data: registrationDB });
-                    console.log('HMI: registrationDB seeded to Firebase on first run.');
+                /* ── registrationDB — load each level as its own doc ── */
+                const rdShards = await Promise.all(_SHARD_LEVELS.map(lvl => fbLoad('hmi_data', 'registrationDB_' + lvl)));
+                const rdAnyExists = rdShards.some(s => s !== undefined && s !== null);
+                if (rdAnyExists) {
+                    _SHARD_LEVELS.forEach((lvl, i) => {
+                        const s = rdShards[i];
+                        if (s && s.data) registrationDB[lvl] = s.data;
+                        else if (s === undefined) registrationDB[lvl] = registrationDB[lvl] || [];
+                    });
+                } else {
+                    /* Fallback to legacy single registrationDB doc */
+                    const rd = await fbLoad('hmi_data', 'registrationDB');
+                    if (rd && rd.data) {
+                        Object.assign(registrationDB, rd.data);
+                        await fbSaveRegistrationDBSharded();
+                        console.log('HMI: registrationDB migrated to sharded docs.');
+                    } else if (rd === undefined) {
+                        Object.assign(registrationDB, _REG_DB_SEED);
+                        await fbSaveRegistrationDBSharded();
+                        console.log('HMI: registrationDB seeded to Firebase on first run.');
+                    }
                 }
 
                 /* ── Load courseCredits from Firebase ── */
@@ -211,10 +284,59 @@
                     if (fmc.feeTypes        && typeof feeTypes         !== 'undefined' && Array.isArray(fmc.feeTypes) && fmc.feeTypes.length) { feeTypes.length = 0; fmc.feeTypes.forEach(f => feeTypes.push(f)); }
                 }
 
-                const att = await fbLoad('hmi_data', 'attendanceData');
-                if (att && att.data && typeof attendanceData !== 'undefined') {
-                    Object.keys(attendanceData).forEach(k => delete attendanceData[k]);
-                    Object.assign(attendanceData, att.data);
+                /* ── attendanceData — load all 4 level shards in parallel ── */
+                const attShards = await Promise.all(_SHARD_LEVELS.map(lvl => fbLoad('hmi_data', 'attendanceData_' + lvl)));
+                const attAnyExists = attShards.some(s => s !== undefined && s !== null);
+                if (attAnyExists) {
+                    if (typeof attendanceData !== 'undefined') { Object.keys(attendanceData).forEach(k => delete attendanceData[k]); }
+                    _mergeObjShards(attendanceData, attShards);
+                } else {
+                    const att = await fbLoad('hmi_data', 'attendanceData');
+                    if (att && att.data && typeof attendanceData !== 'undefined') {
+                        Object.keys(attendanceData).forEach(k => delete attendanceData[k]);
+                        Object.assign(attendanceData, att.data);
+                        await fbSaveAttendanceSharded();
+                        console.log('HMI: attendanceData migrated to sharded docs.');
+                    }
+                }
+
+                /* ── Load curriculum map, course names, academic years, semesters from Firebase ── */
+                const cm = await fbLoad('hmi_config', 'curriculumMap');
+                if (cm && cm.data) {
+                    Object.keys(window.curriculumMap).forEach(k => delete window.curriculumMap[k]);
+                    Object.assign(window.curriculumMap, cm.data);
+                } else if (cm === undefined) {
+                    /* First run — seed from hardcoded defaults */
+                    Object.assign(window.curriculumMap, _CURRICULUM_MAP_SEED);
+                    await fbSave('hmi_config', 'curriculumMap', { data: window.curriculumMap });
+                    console.log('HMI: curriculumMap seeded to Firebase.');
+                }
+
+                const cn = await fbLoad('hmi_config', 'courseNames');
+                if (cn && cn.data) {
+                    Object.keys(window.courseNames).forEach(k => delete window.courseNames[k]);
+                    Object.assign(window.courseNames, cn.data);
+                } else if (cn === undefined) {
+                    Object.assign(window.courseNames, _COURSE_NAMES_SEED);
+                    await fbSave('hmi_config', 'courseNames', { data: window.courseNames });
+                    console.log('HMI: courseNames seeded to Firebase.');
+                }
+
+                const acfg = await fbLoad('hmi_config', 'academicConfig');
+                if (acfg && acfg.academicYears) {
+                    window.academicYears.length = 0;
+                    acfg.academicYears.forEach(y => window.academicYears.push(y));
+                }
+                if (acfg && acfg.semesters) {
+                    window.semesters.length = 0;
+                    acfg.semesters.forEach(s => window.semesters.push(s));
+                }
+                if (acfg === undefined) {
+                    await fbSave('hmi_config', 'academicConfig', {
+                        academicYears: window.academicYears,
+                        semesters: window.semesters
+                    });
+                    console.log('HMI: academicConfig seeded to Firebase.');
                 }
 
                 /* ── Load exam attendance thresholds ── */
@@ -296,7 +418,11 @@
                         }
                     }
                     if (needsMigration) {
-                        await fbSavePasswords();
+                        /* Save curriculum config */
+            await fbSave('hmi_config', 'curriculumMap',  { data: window.curriculumMap });
+            await fbSave('hmi_config', 'courseNames',    { data: window.courseNames });
+            await fbSave('hmi_config', 'academicConfig', { academicYears: window.academicYears, semesters: window.semesters });
+            await fbSavePasswords();
                         console.log('HMI Security: plain-text passwords migrated to SHA-256 hashes.');
                     }
                 }
@@ -442,38 +568,62 @@
             window._fbUnsubs.length = 0;
             function liveToast(msg) { showSyncStatus('\uD83D\uDD04 ' + msg, '#00bcd4'); }
 
-            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('studentList').onSnapshot(doc => {
+            /* hmi_config live listeners — curriculum and academic config */
+            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_config').doc('curriculumMap').onSnapshot(doc => {
                 if (!doc.exists) return; const d = doc.data();
-                if (d && d.data && typeof studentListData !== 'undefined') {
-                    studentListData.length = 0; d.data.forEach(r => studentListData.push(r));
-                    liveToast('Student list updated');
-                }
+                if (d && d.data) { Object.keys(window.curriculumMap).forEach(k => delete window.curriculumMap[k]); Object.assign(window.curriculumMap, d.data); liveToast('Curriculum map updated'); }
             }));
-            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('gradeData').onSnapshot(doc => {
+            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_config').doc('courseNames').onSnapshot(doc => {
                 if (!doc.exists) return; const d = doc.data();
-                if (d && d.data && typeof gradeData !== 'undefined') {
-                    Object.keys(gradeData).forEach(k => delete gradeData[k]);
-                    Object.assign(gradeData, d.data); liveToast('Grade data updated');
-                }
+                if (d && d.data) { Object.keys(window.courseNames).forEach(k => delete window.courseNames[k]); Object.assign(window.courseNames, d.data); liveToast('Course names updated'); }
             }));
-            /* FIX: courseScoreData had no live listener — scores uploaded on another device
-               were never reflected until full page reload. Now kept in sync in real-time.   */
-            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('courseScoreData').onSnapshot(doc => {
+            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_config').doc('academicConfig').onSnapshot(doc => {
                 if (!doc.exists) return; const d = doc.data();
-                if (d && d.data && typeof courseScoreData !== 'undefined') {
-                    Object.keys(courseScoreData).forEach(k => delete courseScoreData[k]);
-                    Object.assign(courseScoreData, d.data); liveToast('Score data updated');
-                }
+                if (d && d.academicYears) { window.academicYears.length = 0; d.academicYears.forEach(y => window.academicYears.push(y)); }
+                if (d && d.semesters)     { window.semesters.length = 0;     d.semesters.forEach(s => window.semesters.push(s)); }
+                liveToast('Academic config updated');
             }));
-            /* FIX: attendanceData had no live listener — attendance saved on another device
-               was never reflected. Now kept in sync in real-time.                           */
-            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('attendanceData').onSnapshot(doc => {
-                if (!doc.exists) return; const d = doc.data();
-                if (d && d.data && typeof attendanceData !== 'undefined') {
-                    Object.keys(attendanceData).forEach(k => delete attendanceData[k]);
-                    Object.assign(attendanceData, d.data); liveToast('Attendance data updated');
-                }
-            }));
+
+            /* studentList — listen to all 4 level shards */
+            _SHARD_LEVELS.forEach(lvl => {
+                if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('studentList_' + lvl).onSnapshot(doc => {
+                    if (!doc.exists) return; const d = doc.data();
+                    if (d && d.data && typeof studentListData !== 'undefined') {
+                        /* Remove existing entries for this level then re-add */
+                        const keep = studentListData.filter(r => _studentLevel(r) !== lvl);
+                        studentListData.length = 0; keep.forEach(r => studentListData.push(r));
+                        d.data.forEach(r => studentListData.push(r));
+                        liveToast('Student list updated (' + lvl + ')');
+                    }
+                }));
+            });
+            /* gradeData — listen to all 4 level shards */
+            _SHARD_LEVELS.forEach(lvl => {
+                if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('gradeData_' + lvl).onSnapshot(doc => {
+                    if (!doc.exists) return; const d = doc.data();
+                    if (d && d.data && typeof gradeData !== 'undefined') {
+                        Object.assign(gradeData, d.data); liveToast('Grade data updated (' + lvl + ')');
+                    }
+                }));
+            });
+            /* courseScoreData — listen to all 4 level shards */
+            _SHARD_LEVELS.forEach(lvl => {
+                if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('courseScoreData_' + lvl).onSnapshot(doc => {
+                    if (!doc.exists) return; const d = doc.data();
+                    if (d && d.data && typeof courseScoreData !== 'undefined') {
+                        Object.assign(courseScoreData, d.data); liveToast('Score data updated (' + lvl + ')');
+                    }
+                }));
+            });
+            /* attendanceData — listen to all 4 level shards */
+            _SHARD_LEVELS.forEach(lvl => {
+                if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('attendanceData_' + lvl).onSnapshot(doc => {
+                    if (!doc.exists) return; const d = doc.data();
+                    if (d && d.data && typeof attendanceData !== 'undefined') {
+                        Object.assign(attendanceData, d.data); liveToast('Attendance updated (' + lvl + ')');
+                    }
+                }));
+            });
             if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('paymentLedger').onSnapshot(doc => {
                 if (!doc.exists) return; const d = doc.data();
                 if (d && d.data && typeof paymentLedger !== 'undefined') {
@@ -488,15 +638,17 @@
                     liveToast('Payment requests updated');
                 }
             }));
-            if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('registrationDB').onSnapshot(doc => {
-                if (!doc.exists) return; const d = doc.data();
-                if (d && d.data && typeof registrationDB !== 'undefined') {
-                    Object.assign(registrationDB, d.data);
-                    /* FIX: re-sync studentListData every time registrationDB updates */
-                    if (typeof syncStudentListFromDB === 'function') syncStudentListFromDB();
-                    liveToast('Registration updated');
-                }
-            }));
+            /* registrationDB — listen to all 4 level shards */
+            _SHARD_LEVELS.forEach(lvl => {
+                if(window.db) window._fbUnsubs.push(window.db.collection('hmi_data').doc('registrationDB_' + lvl).onSnapshot(doc => {
+                    if (!doc.exists) return; const d = doc.data();
+                    if (d && d.data && typeof registrationDB !== 'undefined') {
+                        registrationDB[lvl] = d.data;
+                        if (typeof syncStudentListFromDB === 'function') syncStudentListFromDB();
+                        liveToast('Registration updated (' + lvl + ')');
+                    }
+                }));
+            });
             if(window.db) window._fbUnsubs.push(window.db.collection('hmi_secure').doc('permSettings').onSnapshot(doc => {
                 if (!doc.exists) return; const ps = doc.data(); if (!ps) return;
                 if (ps.permMatrix && typeof permMatrix !== 'undefined') {
@@ -613,27 +765,93 @@
             }));
         }
 
-        /* fbSaveAll — saves all system data to Firebase cloud */
+        /* ══════════════════════════════════════════════
+           SHARDED SAVE HELPERS
+           Each big collection is split by student level so no single
+           Firestore document ever exceeds the 1 MB hard limit.
+           Levels: Diploma | Degree | Masters | PhD
+        ══════════════════════════════════════════════ */
+
+        async function fbSaveStudentListSharded() {
+            const byLevel = { Diploma: [], Degree: [], Masters: [], PhD: [] };
+            (typeof studentListData !== 'undefined' ? studentListData : []).forEach(r => {
+                const lvl = _studentLevel(r);
+                if (byLevel[lvl]) byLevel[lvl].push(r); else byLevel['Degree'].push(r);
+            });
+            await Promise.all(_SHARD_LEVELS.map(lvl => fbSave('hmi_data', 'studentList_' + lvl, { data: byLevel[lvl] })));
+        }
+
+        async function fbSaveRegistrationDBSharded() {
+            await Promise.all(_SHARD_LEVELS.map(lvl =>
+                fbSave('hmi_data', 'registrationDB_' + lvl, { data: (typeof registrationDB !== 'undefined' ? (registrationDB[lvl] || []) : []) })
+            ));
+        }
+
+        /* Grade & score data keys are "Year-Sem" strings shared across levels.
+           We shard by looking up which students belong to each level via studentListData. */
+        function _buildObjShard(sourceObj, lvl) {
+            const lvlIds = new Set(
+                (typeof studentListData !== 'undefined' ? studentListData : [])
+                    .filter(r => _studentLevel(r) === lvl)
+                    .map(r => (r['student id'] || '').trim())
+            );
+            const shard = {};
+            Object.entries(sourceObj || {}).forEach(([key, rows]) => {
+                if (!Array.isArray(rows)) { shard[key] = rows; return; }
+                const filtered = rows.filter(r => lvlIds.has((r['student id'] || r['studentId'] || '').trim()));
+                if (filtered.length) shard[key] = filtered;
+            });
+            return shard;
+        }
+
+        /* Attendance keys: "cls|lvl|dept|year|sem|courseId" — level is index 1 */
+        function _buildAttendanceShard(lvl) {
+            const shard = {};
+            Object.entries(typeof attendanceData !== 'undefined' ? attendanceData : {}).forEach(([key, val]) => {
+                const parts = key.split('|');
+                if (parts[1] && parts[1].trim() === lvl) shard[key] = val;
+            });
+            return shard;
+        }
+
+        async function fbSaveGradeDataSharded() {
+            await Promise.all(_SHARD_LEVELS.map(lvl =>
+                fbSave('hmi_data', 'gradeData_' + lvl, { data: _buildObjShard(typeof gradeData !== 'undefined' ? gradeData : {}, lvl) })
+            ));
+        }
+
+        async function fbSaveScoreDataSharded() {
+            await Promise.all(_SHARD_LEVELS.map(lvl =>
+                fbSave('hmi_data', 'courseScoreData_' + lvl, { data: _buildObjShard(typeof courseScoreData !== 'undefined' ? courseScoreData : {}, lvl) })
+            ));
+        }
+
+        async function fbSaveAttendanceSharded() {
+            await Promise.all(_SHARD_LEVELS.map(lvl =>
+                fbSave('hmi_data', 'attendanceData_' + lvl, { data: _buildAttendanceShard(lvl) })
+            ));
+        }
+
+        /* fbSaveAll — saves all system data to Firebase cloud (sharded where needed) */
         async function fbSaveAll() {
-            showSyncStatus('\u23f3 Saving to cloud...', '#ffae00');
+            showSyncStatus('⏳ Saving to cloud...', '#ffae00');
             auditLog('Save All', 'Manual cloud save by ' + (window._currentUser || 'Unknown'));
-            await fbSave('hmi_data', 'studentList',        { data: typeof studentListData        !== 'undefined' ? studentListData        : [] });
-            await fbSave('hmi_data', 'gradeData',          { data: typeof gradeData              !== 'undefined' ? gradeData              : {} });
-            await fbSave('hmi_data', 'courseScoreData',    { data: typeof courseScoreData        !== 'undefined' ? courseScoreData        : {} });
+            await fbSaveStudentListSharded();
+            await fbSaveGradeDataSharded();
+            await fbSaveScoreDataSharded();
             await fbSave('hmi_data', 'paymentLedger',      { data: typeof paymentLedger          !== 'undefined' ? paymentLedger          : [] });
             await fbSave('hmi_data', 'studentPaymentReqs', { data: typeof studentPaymentRequests !== 'undefined' ? studentPaymentRequests : [] });
-            await fbSave('hmi_data', 'registrationDB',     { data: typeof registrationDB         !== 'undefined' ? registrationDB         : {} });
+            await fbSaveRegistrationDBSharded();
             await fbSave('hmi_data', 'courseCredits',      { data: typeof courseCredits           !== 'undefined' ? courseCredits           : {} });
             await fbSave('hmi_data', 'courseIDs',          { data: typeof courseIDs               !== 'undefined' ? courseIDs               : {} });
             await fbSave('hmi_data', 'permMatrix',         { data: typeof permMatrix             !== 'undefined' ? permMatrix             : [] });
             await fbSave('hmi_data', 'gradeScale',         { data: window.GRADE_SCALE });
-            await fbSave('hmi_data', 'attendanceData',     { data: typeof attendanceData !== 'undefined' ? attendanceData : {} });
+            await fbSaveAttendanceSharded();
             await fbSavePasswords();
             await fbSavePermSettings();
             await fbSaveFeeConfig();
-            showSyncStatus('\u2705 All data saved to cloud', '#4caf50');
+            showSyncStatus('✅ All data saved to cloud', '#4caf50');
         }
-
         /* ══════════════════════════════════════════════
            SHARED PRINT HELPER
            Call: printSection(titleText, contentHtml)
@@ -1108,7 +1326,7 @@
 
     <style>
         /* ── HMI SYSTEM STYLES ── */
-        body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; width: 100%; box-sizing: border-box; }
+        body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; width: 100%; box-sizing: border-box; max-width: 100vw; }
         .top-header { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px 10px; border-bottom: 2px solid #333; width: 100%; box-sizing: border-box; }
         .flag-box img { width: 45px; height: 30px; border: 1px solid #555; border-radius: 2px; }
         .lang-selector { display: flex; gap: 8px; align-items: center; }
@@ -1118,7 +1336,7 @@
         .nav-container { padding: 0; display: flex; flex-direction: column; gap: 0; background: #161616; border-bottom: 2px solid #2a2a2a; width: 100%; box-sizing: border-box; margin-bottom: 0; }
         .nav-row { display: flex; gap: 0; min-height: 0; width: 100%; box-sizing: border-box; flex-wrap: wrap; }
         /* tier-2 = top nav row (GENERAL SYSTEM…) → PILL / STADIUM */
-        #tier-2 button { flex: 1; white-space: nowrap; font-size: 12px; padding: 14px 12px; border-radius: 20px; clip-path: none; }
+        #tier-2 button { flex: 0 0 auto; white-space: nowrap; font-size: 11px; padding: 12px 14px; border-radius: 20px; clip-path: none; min-width: max-content; }
         #tier-2.nav-row { gap: 4px; padding: 4px 6px; background: #111; }
         /* tier-3 = sub-nav row (COURSE LIST…) → CUT-CORNER */
         #tier-3 button { flex: 1; font-size: 8px; padding: 5px 8px; border-radius: 0; clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px); }
@@ -1148,6 +1366,8 @@
             margin-bottom:4px;
         }
         .nav-row:empty { display: none; }
+        #tier-2::-webkit-scrollbar { display: none; }
+        .bottom-nav::-webkit-scrollbar { display: none; }
         .nav-row button { border-right-width: 0; }
         .nav-row button:last-child { border-right-width: 1px; }
         button { background: linear-gradient(180deg, #2d2d2d 0%, #222222 100%); color: #999; border: 1px solid #3d3d3d; padding: 10px 12px; flex: none; cursor: pointer; font-weight: 700; text-transform: uppercase; font-size: 10px; border-radius: 4px 12px 4px 12px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); letter-spacing: 0.5px; }
@@ -1161,13 +1381,13 @@
         #tier-3 button.reg-sub   { background:linear-gradient(180deg,#2a1800,#1a0f00); color:#ffae00; border-color:#5c3d00; }
         #tier-3 button.regis-sub { background:linear-gradient(180deg,#1a0a2a,#110620); color:#ce93d8; border-color:#4a1a6a; }
         #tier-3 button.fin-sub   { background:linear-gradient(180deg,#1a1500,#100d00); color:#ffd700; border-color:#4a3d00; }
-        #display-area { background-color: #1e1e1e; border: 1px solid #333; margin: 0 0 0 0; padding: 20px; flex-grow: 1; overflow-y: auto; border-radius: 8px; }
+        #display-area { background-color: #1e1e1e; border: 1px solid #333; margin: 0; padding: 0; flex: 1; min-height: 0; overflow: hidden; border-radius: 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
         th { background: #333; color: #00a2ff; padding: 10px; border: 1px solid #444; text-align: left; }
         td { padding: 8px; border: 1px solid #444; background: #252525; }
         tr:nth-child(even) td { background: #1a1a1a; }
-        .bottom-nav { width: 100%; display: flex; background: #1a1a1a; border-top: 2px solid #333; padding: 0; gap: 0; box-sizing: border-box; }
-        .dept-btn { flex: 1; padding: 10px 4px; border: 1px solid #333; border-right-width: 0; background: #222; color: #888; cursor: pointer; font-size: 10px; font-weight: bold; border-radius: 4px 12px 4px 12px; transition: all 0.2s; }
+        .bottom-nav { width: 100%; display: flex; background: #1a1a1a; border-top: 2px solid #333; padding: 0; gap: 0; box-sizing: border-box; flex-shrink: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .dept-btn { flex: 1; min-width: 52px; padding: 8px 2px; border: 1px solid #333; border-right-width: 0; background: #222; color: #888; cursor: pointer; font-size: 9px; font-weight: bold; border-radius: 4px 12px 4px 12px; transition: all 0.2s; }
         .dept-btn:last-of-type { border-right-width: 1px; }
         .dept-btn:hover { background: #2a2a2a; color: #00a2ff; border-color: #444; }
         .home-btn { flex: 1; background: linear-gradient(135deg, #cc0000 0%, #990000 100%); color: white; font-weight: bold; cursor: pointer; border: none; font-size: 11px; border-radius: 4px 12px 4px 12px; box-shadow: none; padding: 10px 4px; }
@@ -1633,7 +1853,7 @@
 
     <!-- ── HMI NAVIGATION ── -->
     <div class="nav-container">
-        <div class="nav-row" id="tier-2" style="flex-wrap:nowrap; overflow-x:auto; width:100%; position:relative;">
+        <div class="nav-row" id="tier-2" style="flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; width:100%; position:relative; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
             <button id="btn-sys"  class="active" onclick="loadTier3('System', this)" data-i18n="nav-system" style="flex:1; font-size:10px;">General System</button>
             <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:1; font-size:10px;">🗄 Database</button>
 
@@ -1656,9 +1876,9 @@
     </div>
 
     <!-- ── HMI DISPLAY AREA ── -->
-    <div id="display-area" style="padding:0; display:flex; flex-direction:column;">
+    <div id="display-area" style="padding:0; display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;">
         <div id="drill-nav-area" style="display:flex; flex-direction:column; width:100%;"></div>
-        <div id="content-view" style="padding:20px; flex:1;">
+        <div id="content-view" style="padding:16px; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; box-sizing:border-box;">
             <span class="lang-text eng show">WEL COME!!</span>
             <span class="lang-text ao">BAGA NAGAAN DHUFTAN!!</span>
             <span class="lang-text amh">እንኳን ደህና መጡ!!</span>
@@ -1666,13 +1886,12 @@
     </div>
 
     <!-- ── HMI BOTTOM NAV ── -->
-    <div style="display:flex; flex-direction:column; align-items:stretch; width:100%; box-sizing:border-box;">
+    <div style="display:flex; flex-direction:column; align-items:stretch; width:100%; box-sizing:border-box; flex-shrink:0;">
         <div class="bottom-nav">
             <button class="dept-btn" onclick="openSettings()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#1a0d2e,#0d0619); color:#ce93d8; border-color:#7b1fa2;">⚙<span style="font-size:9px; font-weight:bold;">Settings</span></button>
             <button class="dept-btn" onclick="showCSDescription()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#1a1200,#0d0900); color:#ffe082; border-color:#f9a825;">🖥️<span style="font-size:9px; font-weight:bold;">Description</span></button>
             <button class="dept-btn" onclick="openLawModal()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#1a0000,#0d0000); color:#ef9a9a; border-color:#c62828;">⚖️<span style="font-size:9px; font-weight:bold;">Rules</span></button>
 
-            <button class="dept-btn" onclick="loadTier3('P2', document.getElementById('btn-p2-proxy'))" id="btn-p2-proxy" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#001a10,#000d08); color:#80cbc4; border-color:#00796b;">🖥️<span style="font-size:9px; font-weight:bold;">Ms Office</span></button>
             <button class="dept-btn" onclick="launchStudentExamPortal()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#001a2a,#000d1a); color:#00e5ff; border-color:#00688b;">📝<span style="font-size:9px; font-weight:bold;">Exam Portal</span></button>
             <button class="dept-btn" onclick="openStudentExamResults()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:linear-gradient(180deg,#001a0a,#000d06); color:#81c784; border-color:#1a5c20;">📊<span style="font-size:9px; font-weight:bold;">Exam Results</span></button>
             <button class="home-btn" onclick="location.reload()" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">🏠<span style="font-size:9px; font-weight:bold;">Home</span></button>
@@ -2510,8 +2729,9 @@
 
         const attendanceData = {}; /* key:"cls|lvl|dept|year|sem|courseId" → [{sid,name,dates:{YYYY-MM-DD:true/false}}] */
 
-        const academicYears = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"];
-        const semesters = ["Sem I", "Sem II", "Sem III"];
+        /* academicYears and semesters are loaded from Firebase into window.academicYears / window.semesters */
+        const academicYears = window.academicYears;
+        const semesters     = window.semesters;
 
         function clearDrillDownRows() {
             /* Clear all drill rows from dashboard */
@@ -3509,7 +3729,7 @@
 
                 /* Init from group students */
                 attendanceData[attKey] = groupStudents.map(s => ({ sid: s.sid, name: s.name, dates: {} }));
-                fbSave('hmi_data', 'attendanceData', { data: attendanceData });
+                fbSaveAttendanceSharded();
                 renderAttendancePanel(attKey, todayStr, courseId, cls, lvl, dept, year, sem, relevantRows);
                 return;
             }
@@ -3681,7 +3901,7 @@
 
         /* ── Save only ── */
         function attSaveOnly(attKey) {
-            fbSave('hmi_data', 'attendanceData', { data: attendanceData });
+            fbSaveAttendanceSharded();
             auditLog('Attendance Saved', 'Key: ' + attKey);
             showSyncStatus('✅ Attendance saved', '#4caf50');
         }
@@ -4176,53 +4396,8 @@
             if (!view) return;
             const isAdmin = window._currentUser === 'Admin';
 
-            const curriculumMap = {
-                "ENGL101":{"year":"Year 1","sem":"Sem I"},
-                "MATH101":{"year":"Year 1","sem":"Sem I"},
-                "PHYS101":{"year":"Year 1","sem":"Sem I"},
-                "PHIL101":{"year":"Year 1","sem":"Sem I"},
-                "PHED101":{"year":"Year 1","sem":"Sem I"},
-                "PSYC102":{"year":"Year 1","sem":"Sem II"},
-                "GEOG102":{"year":"Year 1","sem":"Sem II"},
-                "HIST102":{"year":"Year 1","sem":"Sem II"},
-                "MATH102":{"year":"Year 1","sem":"Sem II"},
-                "COMP103":{"year":"Year 1","sem":"Sem III"},
-                "MATH103":{"year":"Year 1","sem":"Sem III"},
-                "COMP201":{"year":"Year 2","sem":"Sem I"},
-                "MATH201":{"year":"Year 2","sem":"Sem I"},
-                "COMP202":{"year":"Year 2","sem":"Sem I"},
-                "COMP203":{"year":"Year 2","sem":"Sem I"},
-                "COMP204":{"year":"Year 2","sem":"Sem II"},
-                "COMP205":{"year":"Year 2","sem":"Sem II"},
-                "COMP206":{"year":"Year 2","sem":"Sem II"},
-                "COMP207":{"year":"Year 2","sem":"Sem III"},
-                "COMP208":{"year":"Year 2","sem":"Sem III"},
-                "COMP209":{"year":"Year 2","sem":"Sem III"},
-                "COMP301":{"year":"Year 3","sem":"Sem I"},
-                "COMP302":{"year":"Year 3","sem":"Sem I"},
-                "COMP303":{"year":"Year 3","sem":"Sem I"},
-                "COMP304":{"year":"Year 3","sem":"Sem II"},
-                "COMP305":{"year":"Year 3","sem":"Sem II"},
-                "COMP306":{"year":"Year 3","sem":"Sem II"},
-                "COMP307":{"year":"Year 3","sem":"Sem II"}
-            };
-
-            const courseNames = {
-                "ENGL101":"Communicative English","MATH101":"Mathematics",
-                "PHYS101":"Physics","PHIL101":"Critical Thinking",
-                "PHED101":"Physical Fitness","PSYC102":"Psychology",
-                "GEOG102":"Geography","HIST102":"History",
-                "MATH102":"Applied Mathematics I","COMP103":"Intro to Programming",
-                "MATH103":"Applied Mathematics II","COMP201":"Advanced DB",
-                "MATH201":"Numerical Analysis","COMP202":"DS and Algorithm",
-                "COMP203":"CO and Architecture","COMP204":"OOP",
-                "COMP205":"OS","COMP206":"A&C Theory",
-                "COMP207":"Wireless Com. & Mobile","COMP208":"SE",
-                "COMP209":"Microprocessor & Assembly","COMP301":"Advanced Java Programming",
-                "COMP302":"Design Algorithm","COMP303":"Programming",
-                "COMP304":"Intro to AI","COMP305":"Networking",
-                "COMP306":"Research","COMP307":"Compiler Design"
-            };
+            const curriculumMap = window.curriculumMap;
+            const courseNames   = window.courseNames;
 
             /* Deduplicate and filter to selected year + semester */
             const seenIDs = {};
@@ -4331,22 +4506,7 @@
         /* Admin: delete all courses for this semester from credits */
         function adminCreditDeleteAll(year, sem, cls, lvl, dept) {
             if (!confirm(`⚠️ Delete ALL courses for ${year} ${sem}?\nThis cannot be undone.`)) return;
-            const curriculumMap = {
-                "ENGL101":{"year":"Year 1","sem":"Sem I"},"MATH101":{"year":"Year 1","sem":"Sem I"},
-                "PHYS101":{"year":"Year 1","sem":"Sem I"},"PHIL101":{"year":"Year 1","sem":"Sem I"},
-                "PHED101":{"year":"Year 1","sem":"Sem I"},"PSYC102":{"year":"Year 1","sem":"Sem II"},
-                "GEOG102":{"year":"Year 1","sem":"Sem II"},"HIST102":{"year":"Year 1","sem":"Sem II"},
-                "MATH102":{"year":"Year 1","sem":"Sem II"},"COMP103":{"year":"Year 1","sem":"Sem III"},
-                "MATH103":{"year":"Year 1","sem":"Sem III"},"COMP201":{"year":"Year 2","sem":"Sem I"},
-                "MATH201":{"year":"Year 2","sem":"Sem I"},"COMP202":{"year":"Year 2","sem":"Sem I"},
-                "COMP203":{"year":"Year 2","sem":"Sem I"},"COMP204":{"year":"Year 2","sem":"Sem II"},
-                "COMP205":{"year":"Year 2","sem":"Sem II"},"COMP206":{"year":"Year 2","sem":"Sem II"},
-                "COMP207":{"year":"Year 2","sem":"Sem III"},"COMP208":{"year":"Year 2","sem":"Sem III"},
-                "COMP209":{"year":"Year 2","sem":"Sem III"},"COMP301":{"year":"Year 3","sem":"Sem I"},
-                "COMP302":{"year":"Year 3","sem":"Sem I"},"COMP303":{"year":"Year 3","sem":"Sem I"},
-                "COMP304":{"year":"Year 3","sem":"Sem II"},"COMP305":{"year":"Year 3","sem":"Sem II"},
-                "COMP306":{"year":"Year 3","sem":"Sem II"},"COMP307":{"year":"Year 3","sem":"Sem II"}
-            };
+            const curriculumMap = window.curriculumMap;
             Object.entries(curriculumMap).forEach(([id, loc]) => {
                 if (loc.year === year && loc.sem === sem) delete courseCredits[id];
             });
@@ -4366,6 +4526,142 @@
             auditLog('Admin Add Credit', `Added ${cid} (${hrs} hrs) to ${year} ${sem}`);
             fbSaveAll();
             displayCreditsTable(year, sem, cls, lvl, dept);
+        }
+
+        /* ── Admin: Edit Academic Config (years, semesters, curriculum, course names) ── */
+        function showAcademicConfigEditor() {
+            const view = document.getElementById('content-view');
+            const yrs  = (window.academicYears || []).join(', ');
+            const sems = (window.semesters || []).join(', ');
+            const cmRows = Object.entries(window.curriculumMap || {}).map(([id, loc]) =>
+                `<tr>
+                  <td style="padding:3px 6px;"><input value="${id}" id="cm_id_${id}" style="width:90px;background:#111;color:#fff;border:1px solid #333;border-radius:4px;padding:2px 4px;"></td>
+                  <td style="padding:3px 6px;"><input value="${loc.year}" id="cm_yr_${id}" style="width:80px;background:#111;color:#fff;border:1px solid #333;border-radius:4px;padding:2px 4px;"></td>
+                  <td style="padding:3px 6px;"><input value="${loc.sem}"  id="cm_sm_${id}" style="width:70px;background:#111;color:#fff;border:1px solid #333;border-radius:4px;padding:2px 4px;"></td>
+                  <td style="padding:3px 4px;"><button onclick="deleteCmRow('${id}')" style="background:#7a0000;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;">✕</button></td>
+                </tr>`).join('');
+            const cnRows = Object.entries(window.courseNames || {}).map(([id, name]) =>
+                `<tr>
+                  <td style="padding:3px 6px;color:#aaa;font-size:0.78rem;">${id}</td>
+                  <td style="padding:3px 6px;"><input value="${name}" id="cn_${id}" style="width:200px;background:#111;color:#fff;border:1px solid #333;border-radius:4px;padding:2px 4px;"></td>
+                </tr>`).join('');
+            view.innerHTML = `
+            <div style="max-width:700px;margin:10px auto 40px;font-family:'Segoe UI',sans-serif;color:#e0e0e0;">
+              <h2 style="color:#ffd700;font-size:1rem;letter-spacing:1px;">⚙️ Academic Configuration Editor</h2>
+              <p style="color:#888;font-size:0.75rem;">All changes save directly to Firebase — no hardcode.</p>
+
+              <!-- Academic Years & Semesters -->
+              <div style="background:#111;border:1px solid #222;border-radius:10px;padding:14px;margin-bottom:14px;">
+                <div style="color:#00e5ff;font-size:0.78rem;font-weight:bold;margin-bottom:10px;">📅 ACADEMIC YEARS &amp; SEMESTERS</div>
+                <label style="font-size:0.78rem;color:#aaa;">Academic Years (comma-separated)</label><br>
+                <input id="cfg_years" value="${yrs}" style="width:100%;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:6px;padding:6px 10px;margin:4px 0 10px;box-sizing:border-box;">
+                <label style="font-size:0.78rem;color:#aaa;">Semesters (comma-separated)</label><br>
+                <input id="cfg_sems" value="${sems}" style="width:100%;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:6px;padding:6px 10px;margin:4px 0 10px;box-sizing:border-box;">
+                <button onclick="saveAcademicYearsSems()" style="background:linear-gradient(180deg,#005a9e,#003a6e);color:#fff;border:1px solid #00a2ff;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:0.8rem;">💾 Save Years &amp; Semesters</button>
+              </div>
+
+              <!-- Curriculum Map -->
+              <div style="background:#111;border:1px solid #222;border-radius:10px;padding:14px;margin-bottom:14px;">
+                <div style="color:#00e5ff;font-size:0.78rem;font-weight:bold;margin-bottom:8px;">🗺️ CURRICULUM MAP (Course → Year/Sem)</div>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%;border-collapse:collapse;font-size:0.78rem;" id="cm-table">
+                    <thead><tr style="color:#555;">
+                      <th style="text-align:left;padding:4px 6px;">Course ID</th>
+                      <th style="text-align:left;padding:4px 6px;">Year</th>
+                      <th style="text-align:left;padding:4px 6px;">Semester</th>
+                      <th></th>
+                    </tr></thead>
+                    <tbody id="cm-tbody">${cmRows}</tbody>
+                  </table>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                  <button onclick="addCmRow()" style="background:linear-gradient(180deg,#0d2b0d,#061806);color:#81c784;border:1px solid #2e7d32;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.78rem;">➕ Add Course</button>
+                  <button onclick="saveCurriculumMap()" style="background:linear-gradient(180deg,#005a9e,#003a6e);color:#fff;border:1px solid #00a2ff;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.78rem;">💾 Save Curriculum Map</button>
+                </div>
+              </div>
+
+              <!-- Course Names -->
+              <div style="background:#111;border:1px solid #222;border-radius:10px;padding:14px;margin-bottom:14px;">
+                <div style="color:#00e5ff;font-size:0.78rem;font-weight:bold;margin-bottom:8px;">📚 COURSE DISPLAY NAMES</div>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+                    <thead><tr style="color:#555;">
+                      <th style="text-align:left;padding:4px 6px;">Course ID</th>
+                      <th style="text-align:left;padding:4px 6px;">Display Name</th>
+                    </tr></thead>
+                    <tbody>${cnRows}</tbody>
+                  </table>
+                </div>
+                <div style="margin-top:10px;">
+                  <button onclick="saveCourseNames()" style="background:linear-gradient(180deg,#005a9e,#003a6e);color:#fff;border:1px solid #00a2ff;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.78rem;">💾 Save Course Names</button>
+                </div>
+              </div>
+
+              <div id="acfg-status" style="text-align:center;color:#4caf50;font-size:0.8rem;min-height:20px;"></div>
+            </div>`;
+        }
+
+        function saveAcademicYearsSems() {
+            const yrs = document.getElementById('cfg_years').value.split(',').map(s => s.trim()).filter(Boolean);
+            const sems = document.getElementById('cfg_sems').value.split(',').map(s => s.trim()).filter(Boolean);
+            if (!yrs.length || !sems.length) { alert('Years and semesters cannot be empty.'); return; }
+            window.academicYears.length = 0; yrs.forEach(y => window.academicYears.push(y));
+            window.semesters.length = 0; sems.forEach(s => window.semesters.push(s));
+            fbSave('hmi_config', 'academicConfig', { academicYears: window.academicYears, semesters: window.semesters });
+            auditLog('Academic Config Changed', JSON.stringify({ academicYears: window.academicYears, semesters: window.semesters }));
+            document.getElementById('acfg-status').textContent = '✅ Years & Semesters saved to Firebase';
+        }
+
+        let _cmDeletedIds = [];
+        function deleteCmRow(id) {
+            _cmDeletedIds.push(id);
+            const row = document.getElementById('cm_id_' + id)?.closest('tr');
+            if (row) row.style.opacity = '0.3';
+        }
+
+        function addCmRow() {
+            const tbody = document.getElementById('cm-tbody');
+            const tempId = 'NEW_' + Date.now();
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td style="padding:3px 6px;"><input id="cm_id_${tempId}" placeholder="e.g. COMP401" style="width:90px;background:#111;color:#fff;border:1px solid #00a2ff;border-radius:4px;padding:2px 4px;"></td>
+              <td style="padding:3px 6px;"><input id="cm_yr_${tempId}" placeholder="Year 4" style="width:80px;background:#111;color:#fff;border:1px solid #333;border-radius:4px;padding:2px 4px;"></td>
+              <td style="padding:3px 6px;"><input id="cm_sm_${tempId}" placeholder="Sem I" style="width:70px;background:#111;color:#fff;border:1px solid #333;border-radius:4px;padding:2px 4px;"></td>
+              <td></td>`;
+            tbody.appendChild(tr);
+        }
+
+        function saveCurriculumMap() {
+            const rows = document.querySelectorAll('#cm-tbody tr');
+            const newMap = {};
+            rows.forEach(tr => {
+                if (tr.style.opacity === '0.3') return;
+                const idEl = tr.querySelector('input[id^="cm_id_"]');
+                const yrEl = tr.querySelector('input[id^="cm_yr_"]');
+                const smEl = tr.querySelector('input[id^="cm_sm_"]');
+                if (!idEl || !yrEl || !smEl) return;
+                const id = idEl.value.trim().toUpperCase();
+                const yr = yrEl.value.trim();
+                const sm = smEl.value.trim();
+                if (id && yr && sm) newMap[id] = { year: yr, sem: sm };
+            });
+            Object.keys(window.curriculumMap).forEach(k => delete window.curriculumMap[k]);
+            Object.assign(window.curriculumMap, newMap);
+            fbSave('hmi_config', 'curriculumMap', { data: window.curriculumMap });
+            auditLog('Curriculum Map Changed', `${Object.keys(newMap).length} courses saved`);
+            document.getElementById('acfg-status').textContent = '✅ Curriculum map saved to Firebase';
+        }
+
+        function saveCourseNames() {
+            const inputs = document.querySelectorAll('input[id^="cn_"]');
+            inputs.forEach(inp => {
+                const id = inp.id.replace('cn_', '');
+                const name = inp.value.trim();
+                if (id && name) window.courseNames[id] = name;
+            });
+            fbSave('hmi_config', 'courseNames', { data: window.courseNames });
+            auditLog('Course Names Changed', `${Object.keys(window.courseNames).length} names saved`);
+            document.getElementById('acfg-status').textContent = '✅ Course names saved to Firebase';
         }
 
         function showCSDescription() {
@@ -4489,7 +4785,7 @@
         /* ── Configurable Grade Scale ── */
 
         function getGradeData(s) {
-            const gs = window.GRADE_SCALE || { Aplus:90, A:83, Bplus:75, B:68, Cplus:60, C:50, D:40 };
+            const gs = window.GRADE_SCALE; /* loaded from Firebase via fbLoadAll */
             if (s >= gs.Aplus) return { letter: "A+", point: 4.0 };
             if (s >= gs.A)     return { letter: "A",  point: 4.0 };
             if (s >= gs.Bplus) return { letter: "B+", point: 3.5 };
@@ -4534,6 +4830,42 @@
         const courseIDs     = {}; /* populated from Firebase on load */
 
         /* Seed data — written to Firebase ONCE on first run if Firebase is empty */
+        /* ── FIRST-RUN SEED DATA ─────────────────────────────────────────────
+           These are ONLY used on first launch to seed Firebase.
+           After that, all data lives in Firebase and these are never read.
+        ──────────────────────────────────────────────────────────────────── */
+        const _CURRICULUM_MAP_SEED = {
+            "ENGL101":{"year":"Year 1","sem":"Sem I"},"MATH101":{"year":"Year 1","sem":"Sem I"},
+            "PHYS101":{"year":"Year 1","sem":"Sem I"},"PHIL101":{"year":"Year 1","sem":"Sem I"},
+            "PHED101":{"year":"Year 1","sem":"Sem I"},"PSYC102":{"year":"Year 1","sem":"Sem II"},
+            "GEOG102":{"year":"Year 1","sem":"Sem II"},"HIST102":{"year":"Year 1","sem":"Sem II"},
+            "MATH102":{"year":"Year 1","sem":"Sem II"},"COMP103":{"year":"Year 1","sem":"Sem III"},
+            "MATH103":{"year":"Year 1","sem":"Sem III"},"COMP201":{"year":"Year 2","sem":"Sem I"},
+            "MATH201":{"year":"Year 2","sem":"Sem I"},"COMP202":{"year":"Year 2","sem":"Sem I"},
+            "COMP203":{"year":"Year 2","sem":"Sem I"},"COMP204":{"year":"Year 2","sem":"Sem II"},
+            "COMP205":{"year":"Year 2","sem":"Sem II"},"COMP206":{"year":"Year 2","sem":"Sem II"},
+            "COMP207":{"year":"Year 2","sem":"Sem III"},"COMP208":{"year":"Year 2","sem":"Sem III"},
+            "COMP209":{"year":"Year 2","sem":"Sem III"},"COMP301":{"year":"Year 3","sem":"Sem I"},
+            "COMP302":{"year":"Year 3","sem":"Sem I"},"COMP303":{"year":"Year 3","sem":"Sem I"},
+            "COMP304":{"year":"Year 3","sem":"Sem II"},"COMP305":{"year":"Year 3","sem":"Sem II"},
+            "COMP306":{"year":"Year 3","sem":"Sem II"},"COMP307":{"year":"Year 3","sem":"Sem II"}
+        };
+        const _COURSE_NAMES_SEED = {
+            "ENGL101":"Communicative English","MATH101":"Mathematics",
+            "PHYS101":"Physics","PHIL101":"Critical Thinking",
+            "PHED101":"Physical Fitness","PSYC102":"Psychology",
+            "GEOG102":"Geography","HIST102":"History",
+            "MATH102":"Applied Mathematics I","COMP103":"Intro to Programming",
+            "MATH103":"Applied Mathematics II","COMP201":"Advanced DB",
+            "MATH201":"Numerical Analysis","COMP202":"DS and Algorithm",
+            "COMP203":"CO and Architecture","COMP204":"OOP",
+            "COMP205":"OS","COMP206":"A&C Theory",
+            "COMP207":"Wireless Com. & Mobile","COMP208":"SE",
+            "COMP209":"Microprocessor & Assembly","COMP301":"Advanced Java Programming",
+            "COMP302":"Design Algorithm","COMP303":"Programming",
+            "COMP304":"Intro to AI","COMP305":"Networking",
+            "COMP306":"Research","COMP307":"Compiler Design"
+        };
         const _COURSE_CREDITS_SEED = {
             "com.english":3,"maths":4,"physics":3,"critical thinking":2,"physical fitness":2,
             "Psychology":3,"geography":2,"history":3,"applied maths I":4,
@@ -5354,6 +5686,7 @@
 
                     <button class="btn-feat" style="border-color:#00e5e5;background:#003a3a;" onclick="sqlShowServerPanel()">🌐 University Server</button>
                     <button class="btn-feat" style="border-color:#ff6b6b;background:#7c0000;" onclick="sqlExportAll()">⬇ Export All (JSON)</button>
+                    <button class="btn-feat" style="border-color:#80b0ff;background:#001a2e;color:#80b0ff;" onclick="document.getElementById('sqlOverlay').style.display='none'; showAcademicConfigEditor();">🎓 Acad. Config</button>
                     <button class="btn-feat" id="sqlPwTabBtn" style="border-color:#ffd700;background:#3a2c00;color:#ffd700;margin-left:auto;" onclick="sqlShowPwTab()">🔑 Password</button>
                 </div>
 
@@ -7377,28 +7710,28 @@ This is the first paragraph..."
             /* Perform deletion */
             if (tbl === 'students') {
                 studentListData.length = 0;
-                fbSave('hmi_data', 'studentList', { data: studentListData });
+                fbSaveStudentListSharded();
             } else if (tbl === 'grades') {
                 Object.keys(gradeData).forEach(k => delete gradeData[k]);
-                fbSave('hmi_data', 'gradeData', { data: gradeData });
+                fbSaveGradeDataSharded();
             } else if (tbl === 'scores') {
                 Object.keys(courseScoreData).forEach(k => delete courseScoreData[k]);
-                fbSave('hmi_data', 'courseScoreData', { data: courseScoreData });
+                fbSaveScoreDataSharded();
             } else if (tbl === 'credits') {
                 Object.keys(courseCredits).forEach(k => delete courseCredits[k]);
                 /* credits are embedded in hmi_data — no separate Firebase key; re-export via sqlExportAll is advised */
             } else if (tbl === 'reg_diploma') {
                 registrationDB['Diploma'] = [];
-                fbSave('hmi_data', 'registrationDB', { data: registrationDB });
+                fbSaveRegistrationDBSharded();
             } else if (tbl === 'reg_degree') {
                 registrationDB['Degree'] = [];
-                fbSave('hmi_data', 'registrationDB', { data: registrationDB });
+                fbSaveRegistrationDBSharded();
             } else if (tbl === 'reg_masters') {
                 registrationDB['Masters'] = [];
-                fbSave('hmi_data', 'registrationDB', { data: registrationDB });
+                fbSaveRegistrationDBSharded();
             } else if (tbl === 'reg_phd') {
                 registrationDB['PhD'] = [];
-                fbSave('hmi_data', 'registrationDB', { data: registrationDB });
+                fbSaveRegistrationDBSharded();
             }
 
             auditLog('Table Deleted', 'Admin deleted table: ' + title);
@@ -8743,7 +9076,7 @@ This is the first paragraph..."
             /* Save to level-specific registration DB, then sync studentListData */
             const lvlKey = level === 'PhD' ? 'PhD' : level;
             if (registrationDB[lvlKey]) registrationDB[lvlKey].push(newStudent);
-            fbSave('hmi_data', 'registrationDB', { data: registrationDB }); /* auto-save */
+            fbSaveRegistrationDBSharded(); /* auto-save */
             auditLog('New Student Registered', 'Name: ' + (newStudent.name || newStudent['full name'] || 'N/A') + ' | Level: ' + lvlKey);
             syncStudentListFromDB(); /* keep studentListData in sync */
 
@@ -9192,7 +9525,7 @@ This is the first paragraph..."
             const idx = studentListData.findIndex(r => String(r['student id']) === String(sid));
             if (idx === -1) { alert('Student not found.'); return; }
             studentListData.splice(idx, 1);
-            fbSave('hmi_data', 'studentList', { data: studentListData });
+            fbSaveStudentListSharded();
             auditLog('Registrar Delete Student', `Deleted student ${sid} from ${dept}`);
             regRenderStudentList(document.getElementById('regDataContent'), dept, _regDataFYear, _regDataFSem, _regDataFCls, _regDataFLvl);
         }
@@ -9204,7 +9537,7 @@ This is the first paragraph..."
             for (let i = studentListData.length - 1; i >= 0; i--) {
                 if (studentListData[i].department === dept) studentListData.splice(i, 1);
             }
-            fbSave('hmi_data', 'studentList', { data: studentListData });
+            fbSaveStudentListSharded();
             auditLog('Registrar Delete Dept Students', `Deleted all ${count} students from ${dept}`);
             regRenderStudentList(document.getElementById('regDataContent'), dept, _regDataFYear, _regDataFSem, _regDataFCls, _regDataFLvl);
         }
@@ -11370,7 +11703,7 @@ This is the first paragraph..."
         });
 
         if (changed) {
-            fbSave('hmi_data', 'attendanceData', { data: attendanceData });
+            fbSaveAttendanceSharded();
             if (typeof auditLog === 'function') {
                 auditLog('Course List → Attendance',
                     `Registered ${courseIds.length} course(s) [${courseIds.join(', ')}] for ${cls} · ${lvl} · ${dept} · ${year} · ${sem} — ${groupStudents.length} student(s) enrolled`);
@@ -11503,7 +11836,7 @@ This is the first paragraph..."
             studentListData.splice(i, 1);
         }
         const removed = before - studentListData.length;
-        fbSave('hmi_data', 'studentList', { data: studentListData });
+        fbSaveStudentListSharded();
         auditLog('Students Deleted', `Dept Head (${dept}) deleted ${removed} student record(s) for ${filterDesc}`);
         deptRenderStudents(document.getElementById('deptHeadContent'), dept, fYear, fSem, fCls, fLvl);
     }
@@ -11580,52 +11913,8 @@ This is the first paragraph..."
 
     /* ── Credits tab for Department Head (read-only view) ── */
     function deptRenderCredits(area, dept, fYear, fSem, fCls, fLvl) {
-        const curriculumMap = {
-            "ENGL101":{"year":"Year 1","sem":"Sem I"},
-            "MATH101":{"year":"Year 1","sem":"Sem I"},
-            "PHYS101":{"year":"Year 1","sem":"Sem I"},
-            "PHIL101":{"year":"Year 1","sem":"Sem I"},
-            "PHED101":{"year":"Year 1","sem":"Sem I"},
-            "PSYC102":{"year":"Year 1","sem":"Sem II"},
-            "GEOG102":{"year":"Year 1","sem":"Sem II"},
-            "HIST102":{"year":"Year 1","sem":"Sem II"},
-            "MATH102":{"year":"Year 1","sem":"Sem II"},
-            "COMP103":{"year":"Year 1","sem":"Sem III"},
-            "MATH103":{"year":"Year 1","sem":"Sem III"},
-            "COMP201":{"year":"Year 2","sem":"Sem I"},
-            "MATH201":{"year":"Year 2","sem":"Sem I"},
-            "COMP202":{"year":"Year 2","sem":"Sem I"},
-            "COMP203":{"year":"Year 2","sem":"Sem I"},
-            "COMP204":{"year":"Year 2","sem":"Sem II"},
-            "COMP205":{"year":"Year 2","sem":"Sem II"},
-            "COMP206":{"year":"Year 2","sem":"Sem II"},
-            "COMP207":{"year":"Year 2","sem":"Sem III"},
-            "COMP208":{"year":"Year 2","sem":"Sem III"},
-            "COMP209":{"year":"Year 2","sem":"Sem III"},
-            "COMP301":{"year":"Year 3","sem":"Sem I"},
-            "COMP302":{"year":"Year 3","sem":"Sem I"},
-            "COMP303":{"year":"Year 3","sem":"Sem I"},
-            "COMP304":{"year":"Year 3","sem":"Sem II"},
-            "COMP305":{"year":"Year 3","sem":"Sem II"},
-            "COMP306":{"year":"Year 3","sem":"Sem II"},
-            "COMP307":{"year":"Year 3","sem":"Sem II"}
-        };
-        const courseNames = {
-            "ENGL101":"Communicative English","MATH101":"Mathematics",
-            "PHYS101":"Physics","PHIL101":"Critical Thinking",
-            "PHED101":"Physical Fitness","PSYC102":"Psychology",
-            "GEOG102":"Geography","HIST102":"History",
-            "MATH102":"Applied Mathematics I","COMP103":"Intro to Programming",
-            "MATH103":"Applied Mathematics II","COMP201":"Advanced DB",
-            "MATH201":"Numerical Analysis","COMP202":"DS and Algorithm",
-            "COMP203":"CO and Architecture","COMP204":"OOP",
-            "COMP205":"OS","COMP206":"A&C Theory",
-            "COMP207":"Wireless Com. & Mobile","COMP208":"SE",
-            "COMP209":"Microprocessor & Assembly","COMP301":"Advanced Java Programming",
-            "COMP302":"Design Algorithm","COMP303":"Programming",
-            "COMP304":"Intro to AI","COMP305":"Networking",
-            "COMP306":"Research","COMP307":"Compiler Design"
-        };
+        const curriculumMap = window.curriculumMap;
+        const courseNames   = window.courseNames;
 
         /* Build grouped structure: { "Year X": { "Sem Y": [ {id, name, credits} ] } } */
         const grouped = {};
@@ -11864,8 +12153,8 @@ This is the first paragraph..."
         sub.status = 'Committed';
 
         /* Auto-save to Firebase */
-        fbSave('hmi_data', 'gradeData',       { data: gradeData });
-        fbSave('hmi_data', 'courseScoreData',  { data: courseScoreData });
+        fbSaveGradeDataSharded();
+        fbSaveScoreDataSharded();
 
         deptRenderSubmissions(document.getElementById('deptHeadContent'), dept);
         deptUpdateSubBadge(dept);
