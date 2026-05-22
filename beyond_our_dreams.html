@@ -1326,7 +1326,7 @@
 
     <style>
         /* ── HMI SYSTEM STYLES ── */
-        body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; width: 100%; box-sizing: border-box; max-width: 100vw; }
+        body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; padding-bottom: env(safe-area-inset-bottom, 0px); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; width: 100%; box-sizing: border-box; max-width: 100vw; }
         .top-header { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px 10px; border-bottom: 2px solid #333; width: 100%; box-sizing: border-box; }
         .flag-box img { width: 45px; height: 30px; border: 1px solid #555; border-radius: 2px; }
         .lang-selector { display: flex; gap: 8px; align-items: center; }
@@ -1386,8 +1386,8 @@
         th { background: #333; color: #00a2ff; padding: 10px; border: 1px solid #444; text-align: left; }
         td { padding: 8px; border: 1px solid #444; background: #252525; }
         tr:nth-child(even) td { background: #1a1a1a; }
-        .bottom-nav { width: 100%; display: flex; background: #1a1a1a; border-top: 2px solid #333; padding: 0; gap: 0; box-sizing: border-box; flex-shrink: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-        .dept-btn { flex: 1; min-width: 52px; padding: 8px 2px; border: 1px solid #333; border-right-width: 0; background: #222; color: #888; cursor: pointer; font-size: 9px; font-weight: bold; border-radius: 4px 12px 4px 12px; transition: all 0.2s; }
+        .bottom-nav { width: 100%; display: flex; background: #1a1a1a; border-top: 2px solid #333; padding: 0 0 env(safe-area-inset-bottom, 4px); gap: 0; box-sizing: border-box; flex-shrink: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .dept-btn { flex: 1; min-width: 52px; padding: 10px 2px; border: 1px solid #333; border-right-width: 0; background: #222; color: #888; cursor: pointer; font-size: 9px; font-weight: bold; border-radius: 4px 12px 4px 12px; transition: all 0.2s; }
         .dept-btn:last-of-type { border-right-width: 1px; }
         .dept-btn:hover { background: #2a2a2a; color: #00a2ff; border-color: #444; }
         .home-btn { flex: 1; background: linear-gradient(135deg, #cc0000 0%, #990000 100%); color: white; font-weight: bold; cursor: pointer; border: none; font-size: 11px; border-radius: 4px 12px 4px 12px; box-shadow: none; padding: 10px 4px; }
@@ -1682,7 +1682,11 @@
         /* ── GLOBAL: Student list column order ──
            Enforces: student id → full name → year → semester → level → classification → department → rest */
         window.studentColOrder = function(cols) {
-            const priority = ['student id', 'full name', 'year', 'semester', 'level', 'classification', 'department'];
+            const priority = [
+                'student id', 'full name', 'year', 'semester', 'level', 'classification', 'department',
+                'age', 'country', 'doc file', 'entrance score', 'kebele',
+                'reg date', 'region', 'sex', 'town'
+            ];
             /* case-insensitive matching */
             const lower = cols.map(c => c.toLowerCase());
             const fixed = priority.filter(p => lower.includes(p)).map(p => cols[lower.indexOf(p)]);
@@ -1693,13 +1697,18 @@
 </head>
 <body>
 
-    <!-- ── TOP BAR: LIVE CLOCK (left) + GOOGLE TRANSLATE (right) ── -->
+    <!-- ── TOP BAR: LIVE CLOCK (left) + SYNC STATUS (centre) + GOOGLE TRANSLATE (right) ── -->
     <div style="position:relative; z-index:100; background:#0a0a0a; border-bottom:1px solid #222; padding:3px 10px; display:flex; justify-content:space-between; align-items:center; width:100%; box-sizing:border-box; flex-shrink:0;">
-        <div style="display:flex; align-items:center; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px; flex:1;">
             <span id="liveDate"  style="color:#888; font-size:10px; font-family:'Segoe UI',monospace; letter-spacing:0.3px;"></span>
             <span id="liveClock" style="color:#00a2ff; font-size:11px; font-weight:bold; font-family:'Segoe UI',monospace; letter-spacing:1px;"></span>
         </div>
-        <div id="google_translate_element"></div>
+        <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+            <span id="fbSyncStatus" style="display:none; font-size:0.75rem; font-weight:bold;"></span>
+        </div>
+        <div style="flex:1; display:flex; justify-content:flex-end; align-items:center;">
+            <div id="google_translate_element"></div>
+        </div>
     </div>
 
     <!-- ── HMI TOP HEADER ── -->
@@ -2268,7 +2277,6 @@
 
     <!-- ── FIREBASE SYNC BAR ── -->
     <div style="position:fixed; bottom:0; left:0; width:100%; background:#111; border-top:1px solid #333; display:flex; align-items:center; justify-content:space-between; padding:5px 12px; z-index:400; box-sizing:border-box;">
-        <span id="fbSyncStatus" style="display:none; font-size:0.75rem; font-weight:bold;"></span>
         <span style="color:#555; font-size:0.7rem; display:none;">☁️ Firebase Live - <span id="liveStatus" style="color:#00bcd4;">🟢 Multi-User Active</span></span>
         <button onclick="window.openAuditLog()" style="display:none; background:linear-gradient(180deg,#1a6b2e,#0d4a1f); color:white; border:1px solid #4caf50; border-radius:6px; padding:5px 14px; font-size:0.75rem; font-weight:bold; cursor:pointer; flex:none; text-transform:none; letter-spacing:0;">&#128221; Audit Log</button>
     </div>
