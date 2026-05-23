@@ -1902,7 +1902,7 @@
 
     <!-- ── HMI NAVIGATION ── -->
     <div class="nav-container">
-        <div class="nav-row" id="tier-2" style="flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; width:100%; position:relative; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+        <div class="nav-row" id="tier-2" style="flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; width:100%; position:relative; -webkit-overflow-scrolling:touch; scrollbar-width:none; justify-content:flex-start;">
             <button id="btn-sys"  class="active" onclick="loadTier3('System', this)" data-i18n="nav-system" style="flex:0 0 auto; font-size:10px;">All Program</button>
             <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:0 0 auto; font-size:10px;">🗄 Database</button>
 
@@ -1911,7 +1911,7 @@
             <button onclick="openDeptHeadPanel()" style="flex:0 0 auto; font-size:10px;">🏛️ Dept Head</button>
             <button onclick="openRegistrarPermPanel()" style="flex:0 0 auto; font-size:10px;">📝 Registrar</button>
             <!-- ⋯ more menu button -->
-            <button id="btn-more-menu" onclick="toggleMoreMenu(this)" style="flex:none; width:36px; background:linear-gradient(180deg,#2a2000,#1a1500); color:#ffd700; border-color:#5c4500; font-size:16px; padding:0; letter-spacing:0; text-transform:none; border-radius:6px;" title="More Panels">⋯</button>
+            <button id="btn-more-menu" onclick="toggleMoreMenu(this)" style="flex:none; width:36px; margin-left:auto; background:linear-gradient(180deg,#2a2000,#1a1500); color:#ffd700; border-color:#5c4500; font-size:16px; padding:0; letter-spacing:0; text-transform:none; border-radius:6px;" title="More Panels">⋯</button>
         </div>
         <!-- More Menu Dropdown -->
         <div id="moreMenuDropdown" style="display:none; position:fixed; right:4px; top:auto; z-index:9999; background:#1a1a1a; border:2px solid #5c4500; border-radius:10px; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,0.8); padding:6px;">
