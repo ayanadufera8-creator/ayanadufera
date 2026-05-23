@@ -384,9 +384,11 @@
                 if (pw === null) {
                     /* ── FIREBASE LOAD FAILED (offline/permission error) ── */
                     console.warn('HMI Security: Firebase unavailable — passwords could not be loaded. Login will fail until connection is restored.');
+                    window._fbPasswordsLoaded = true; /* allow through — gate will still block if password is set in memory */
                 } else if (pw === undefined) {
                     /* ── FIRST RUN: no passwords in Firebase yet ── */
                     console.warn('HMI Security: No passwords found in Firebase. Please contact the system administrator.');
+                    window._fbPasswordsLoaded = true;
                 } else {
                     /* Load raw values first */
                     if (pw.adminPassword)        window.ADMIN_PASSWORD         = pw.adminPassword;
@@ -399,6 +401,7 @@
                     if (pw.attendancePassword)   window.ATTENDANCE_PASSWORD    = pw.attendancePassword;
                     if (pw.examCenterPassword)   window.EXAM_CENTER_PASSWORD   = pw.examCenterPassword;
                     if (pw.deptHeadPasswords) { if (!window.deptHeadPasswords) window.deptHeadPasswords = {}; Object.assign(window.deptHeadPasswords, pw.deptHeadPasswords); }
+                    window._fbPasswordsLoaded = true;
 
                     /* Auto-migrate: if any stored password is still plain text, hash it and re-save */
                     let needsMigration = false;
@@ -1336,7 +1339,7 @@
         .nav-container { padding: 0; display: flex; flex-direction: column; gap: 0; background: #161616; border-bottom: 2px solid #2a2a2a; width: 100%; box-sizing: border-box; margin-bottom: 0; }
         .nav-row { display: flex; gap: 0; min-height: 0; width: 100%; box-sizing: border-box; flex-wrap: wrap; }
         /* tier-2 = top nav row (GENERAL SYSTEM…) → PILL / STADIUM */
-        #tier-2 button { flex: 0 0 auto; white-space: nowrap; font-size: 11px; padding: 10px 14px; border-radius: 20px; clip-path: none; min-width: max-content; }
+        #tier-2 button { flex: 0 0 auto; white-space: nowrap; font-size: 11px; padding: 10px 14px; border-radius: 20px; clip-path: none; width: auto; min-width: unset; max-width: unset; }
         #tier-2.nav-row { gap: 4px; padding: 4px 6px; background: #111; }
         /* tier-3 = sub-nav row (COURSE LIST…) → CUT-CORNER */
         #tier-3 button { flex: 1; font-size: 8px; padding: 5px 8px; border-radius: 0; clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px); }
@@ -1598,9 +1601,10 @@
         }
         /* Hide the Google logo text */
         #google_translate_element .goog-te-gadget-simple img { display: none !important; }
-        /* Force button label to English regardless of page content language */
-        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child { font-size: 0 !important; }
-        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child::after { content: 'Select Language'; font-size: 10px !important; color: #fff !important; font-weight: bold; }
+        /* Force button label to "Select Language" regardless of page content language or Google Translate state */
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child,
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child * { font-size: 0 !important; color: transparent !important; visibility: hidden !important; }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child::after { content: 'Select Language' !important; font-size: 10px !important; color: #fff !important; font-weight: bold !important; visibility: visible !important; display: inline !important; }
         .goog-te-gadget { font-size: 0 !important; }
         .goog-te-gadget > span > a { display: none !important; }
     </style>
@@ -1622,18 +1626,21 @@
                 multilanguagePage: true
             }, 'google_translate_element');
             /* Force button label back to "Select Language" and reset to English */
+            var _forceLabelAttempts = 0;
             setTimeout(function forceLangLabel() {
+                _forceLabelAttempts++;
                 const span = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
-                if (span) {
-                    span.textContent = 'Select Language';
-                } else {
-                    setTimeout(forceLangLabel, 300);
-                }
+                if (span) { span.textContent = ''; }
+                /* Wipe any sibling spans that might render the language name */
+                document.querySelectorAll('#google_translate_element .goog-te-menu-value span').forEach(function(s, i) {
+                    if (i === 0) s.textContent = '';
+                });
                 const sel = document.querySelector('.goog-te-combo');
                 if (sel && sel.value !== '' && sel.value !== 'en') {
                     sel.value = 'en';
                     sel.dispatchEvent(new Event('change'));
                 }
+                if (_forceLabelAttempts < 10) setTimeout(forceLangLabel, 500);
             }, 600);
         }
     </script>
@@ -1660,9 +1667,17 @@
                     selectEl.value = 'en';
                     selectEl.dispatchEvent(new Event('change'));
                 }
-                /* Restore label to "Select Language" */
+                /* Restore label to "Select Language" — blank the span so CSS ::after shows */
                 var span = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
-                if (span) span.textContent = 'Select Language';
+                if (span) span.textContent = '';
+                /* Keep re-applying for a few seconds in case Google Translate re-renders */
+                var _domRetry = 0;
+                var _domRetryFn = setInterval(function() {
+                    _domRetry++;
+                    var s = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
+                    if (s) s.textContent = '';
+                    if (_domRetry >= 10) clearInterval(_domRetryFn);
+                }, 500);
             }, 1200);
         });
 
@@ -1888,11 +1903,13 @@
     <!-- ── HMI NAVIGATION ── -->
     <div class="nav-container">
         <div class="nav-row" id="tier-2" style="flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; width:100%; position:relative; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
-            <button id="btn-sys"  class="active" onclick="loadTier3('System', this)" data-i18n="nav-system" style="flex:1; font-size:10px;">General System</button>
-            <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:1; font-size:10px;">🗄 Database</button>
+            <button id="btn-sys"  class="active" onclick="loadTier3('System', this)" data-i18n="nav-system" style="flex:0 0 auto; font-size:10px;">All Program</button>
+            <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:0 0 auto; font-size:10px;">🗄 Database</button>
 
-            <button id="btn-reg"  onclick="loadTier3('RegPanel', this)" style="flex:1; font-size:10px;">📋 Registration</button>
-            <button id="btn-exam" onclick="loadTier3('ExamCenter', this)" style="flex:1; font-size:10px;">📝 Exam Center</button>
+            <button id="btn-reg"  onclick="loadTier3('RegPanel', this)" style="flex:0 0 auto; font-size:10px;">📋 Registration</button>
+            <button onclick="openFinanceHeadPanel()" style="flex:0 0 auto; font-size:10px;">💼 Finance Head</button>
+            <button onclick="openDeptHeadPanel()" style="flex:0 0 auto; font-size:10px;">🏛️ Dept Head</button>
+            <button onclick="openRegistrarPermPanel()" style="flex:0 0 auto; font-size:10px;">📝 Registrar</button>
             <!-- ⋯ more menu button -->
             <button id="btn-more-menu" onclick="toggleMoreMenu(this)" style="flex:none; width:36px; background:linear-gradient(180deg,#2a2000,#1a1500); color:#ffd700; border-color:#5c4500; font-size:16px; padding:0; letter-spacing:0; text-transform:none; border-radius:6px;" title="More Panels">⋯</button>
         </div>
@@ -1900,11 +1917,9 @@
         <div id="moreMenuDropdown" style="display:none; position:fixed; right:4px; top:auto; z-index:9999; background:#1a1a1a; border:2px solid #5c4500; border-radius:10px; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,0.8); padding:6px;">
             <div style="color:#ffd700; font-size:9px; font-weight:bold; padding:4px 10px 6px; border-bottom:1px solid #333; letter-spacing:1px;">PANELS &amp; OFFICES</div>
             <button onclick="loadTier3('P6',document.getElementById('btn-p6-proxy')); closeMoreMenu();" id="btn-p6-proxy" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#ce93d8; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#2a0a4a'" onmouseout="this.style.background='transparent'">👩‍🏫 Teacher File (Get)</button>
-            <button onclick="openRegistrarPermPanel(); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#ce93d8; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#1a0a2a'" onmouseout="this.style.background='transparent'">📝 Registrar's Office</button>
-            <button onclick="openFinanceHeadPanel(); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#ffd700; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#2a2000'" onmouseout="this.style.background='transparent'">💼 Finance Head</button>
+            <button onclick="loadTier3('ExamCenter', this); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#aaa; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">📝 Exam Center</button>
             <button onclick="openStudentFinancePortal(); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#ffd700; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#2a2000'" onmouseout="this.style.background='transparent'">💳 Payment Portal</button>
             <button onclick="openFinanceCashierPanel(); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#4caf50; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#0a2a0a'" onmouseout="this.style.background='transparent'">🏧 Cashier Office</button>
-            <button onclick="openDeptHeadPanel(); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#00e5e5; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#001a1a'" onmouseout="this.style.background='transparent'">🏛️ Head Office (Dept)</button>
         </div>
         <div class="nav-row" id="tier-3"></div>
     </div>
@@ -1948,8 +1963,8 @@
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
                         <span style="font-size:2rem;">🖥️</span>
                         <div>
-                            <h1 style="color:#2c3e50; font-size:1.3rem; margin:0; border-bottom:2px solid #2c3e50; padding-bottom:4px;">BODU Relational HMI System <span class="sysver">v75.0</span></h1>
-                            <p style="color:#888; font-size:0.75rem; margin:4px 0 0;">System Documentation — Beyond Our Dreams University, Bishoftu Campus</p>
+                            <h1 style="color:#2c3e50; font-size:1.3rem; margin:0; border-bottom:2px solid #2c3e50; padding-bottom:4px;">BODU HMI System <span class="sysver">v75.0</span></h1>
+                            <p style="color:#888; font-size:0.75rem; margin:4px 0 0;">Beyond Our Dreams University — Bishoftu Campus</p>
                         </div>
                     </div>
                     <hr style="border-color:#ddd; margin:14px 0 18px;">
@@ -1958,116 +1973,84 @@
 
                         <!-- 1. What Is This System -->
                         <div style="background:#f7f7f7; border-left:5px solid #f0b429; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#b8860b; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🏫 1. What Is This System?</div>
-                            <p style="color:#333; margin:0 0 8px;">The <strong>BODU Relational HMI System</strong> (v75.0) is a comprehensive, cloud-connected academic management platform for <strong>Beyond Our Dreams University (BODU), Bishoftu Campus</strong>. It manages the complete student lifecycle — from registration and fee payment through grade management, attendance tracking, GPA reporting, multi-role administration, and department head review workflows.</p>
-                            <ul style="color:#444; margin:0; padding-left:18px;">
-                                <li>Powered by <strong>Firebase Firestore</strong> for real-time cloud sync across all staff sessions simultaneously — no page refresh needed.</li>
-                                <li>All financial figures are in <strong>ETB (Ethiopian Birr)</strong>.</li>
-                                <li>Interface available in <strong>English, Afaan Oromoo, and Amharic</strong> (toggle in the header).</li>
-                                <li>Runs from a <strong>single HTML file</strong> — no installation, server setup, or internet-facing hosting required.</li>
-                                <li>Includes a built-in <strong>MS Office Suite</strong> (spreadsheet editor with .xlsx export) and a <strong>Universal Student Search</strong> tool accessible from the top navigation.</li>
-                            </ul>
+                            <div style="color:#b8860b; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🏫 About This System</div>
+                            <p style="color:#333; margin:0 0 10px;">The <strong>BODU HMI System</strong> is the digital management platform for <strong>Beyond Our Dreams University, Bishoftu Campus</strong>. It handles student grades, GPA reports, fee payments, attendance, and department workflows — all in one place, updated in real time across all devices.</p>
+                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                <span style="background:#fff3cd; color:#7a5000; padding:4px 10px; border-radius:20px; font-size:0.78rem;">🌐 English / Afaan Oromoo / Amharic</span>
+                                <span style="background:#e8f5e9; color:#1b5e20; padding:4px 10px; border-radius:20px; font-size:0.78rem;">☁️ Real-time cloud sync</span>
+                                <span style="background:#e3f2fd; color:#0d47a1; padding:4px 10px; border-radius:20px; font-size:0.78rem;">💵 All amounts in ETB</span>
+                                <span style="background:#fce4ec; color:#880e4f; padding:4px 10px; border-radius:20px; font-size:0.78rem;">📱 Works on any browser or phone</span>
+                            </div>
                         </div>
 
                         <!-- 2. Who Uses This System -->
                         <div style="background:#f0f7ff; border-left:5px solid #2196f3; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#1565c0; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🔐 2. Who Uses This System?</div>
-                            <ul style="color:#333; margin:0; padding-left:18px;">
-                                <li><strong style="color:#c62828;">Admin (Button 08)</strong> — Full system control: manage all data, set/change all passwords, configure grade scale, manage fee structures, view audit log, export full database.</li>
-                                <li><strong style="color:#6a1a8a;">Registrar (Button 05)</strong> — Manage department permission matrix, control grade upload windows, oversee attendance records, view audit log, send department messages, manage staff passwords.</li>
-                                <li><strong style="color:#1b5e20;">Cashier (Button 03)</strong> — Process and approve student payment requests, collect tuition fees, view auto-filled fee amounts per student.</li>
-                                <li><strong style="color:#e65100;">Finance Head (Button 04)</strong> — Configure fee structures (universal, new-student, per-dept/level matrices), view full payment ledger, send fee notices to students.</li>
-                                <li><strong style="color:#006064;">Dept Head (Button 07)</strong> — Review pending teacher grade submissions for their department; approve or reject submissions and forward approved grades to the Registrar.</li>
-                                <li><strong style="color:#2e7d32;">Teacher (Button 06)</strong> — Upload Score File (A) and Grade File (B) for their assigned department and semester, after the Registrar grants upload permission.</li>
-                                <li><strong style="color:#37474f;">Student (Button 02)</strong> — View semester grades and cumulative GPA, print an official GPA report with verification code, and submit payment requests to the Cashier.</li>
-                                <li><strong style="color:#555;">Server Access (Button 09)</strong> — Reserved for authorised technical personnel; provides direct data import/export and system-level operations.</li>
-                            </ul>
+                            <div style="color:#1565c0; font-weight:bold; font-size:0.92rem; margin-bottom:10px;">🔐 Roles & Access</div>
+                            <div style="display:flex; flex-direction:column; gap:7px; color:#333; font-size:0.82rem;">
+                                <div><strong style="color:#c62828;">Admin — Button 08</strong><br><span style="color:#555;">Full control of the system: upload data, manage all passwords, configure grade scale, and view all logs.</span></div>
+                                <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#6a1a8a;">Registrar — Button 05</strong><br><span style="color:#555;">Open or close grade upload windows per department, review submissions, manage attendance, and update staff passwords.</span></div>
+                                <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#e65100;">Finance Head — Button 04</strong><br><span style="color:#555;">Set fee amounts and view the full payment ledger.</span></div>
+                                <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#1b5e20;">Cashier — Button 03</strong><br><span style="color:#555;">Search a student ID to record fee payments and approve payment requests.</span></div>
+                                <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#006064;">Department Head — Button 07</strong><br><span style="color:#555;">Review grade submissions from teachers in your department, then approve or reject before sending to the Registrar.</span></div>
+                                <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#2e7d32;">Teacher — Button 06</strong><br><span style="color:#555;">Upload scores and grades for your department and semester once the Registrar has opened the upload window.</span></div>
+                                <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#37474f;">Student — Button 02</strong><br><span style="color:#555;">View your semester grades and GPA, and print an official GPA report using your Student ID — no password needed.</span></div>
+                            </div>
                         </div>
 
                         <!-- 3. Student Grade Portal -->
                         <div style="background:#f1f8f1; border-left:5px solid #4caf50; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#2e7d32; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🎓 3. Student Grade Portal — Step by Step</div>
-                            <ul style="color:#333; margin:0; padding-left:18px;">
-                                <li><strong>Step 1 —</strong> Enter your <strong>Student ID</strong> (e.g. <code style="background:#e8f5e9; padding:1px 5px; border-radius:3px;">070/23</code>) and press <em>Next</em>.</li>
-                                <li><strong>Step 2 —</strong> Select your <strong>Classification</strong> (Regular, Extension, Weekend, Distance, Summer).</li>
-                                <li><strong>Step 3 —</strong> Select your <strong>Level of Education</strong> (Diploma, Degree, Masters, PhD).</li>
-                                <li><strong>Step 4 —</strong> Select your <strong>Department</strong>.</li>
-                                <li><strong>Step 5 —</strong> Select your <strong>Academic Year</strong> (Year 1 – Year 5).</li>
-                                <li><strong>Step 6 —</strong> Select your <strong>Semester</strong>. Only semesters containing your data will appear.</li>
-                                <li><strong>Step 7 —</strong> View your results — subject name, letter grade, credit hours, grade point, and cumulative GPA.</li>
-                                <li><strong>Step 8 —</strong> Tap <em>Print Your GPA Results</em> for an official A4 report complete with the registrar signature line and a unique verification code.</li>
-                            </ul>
+                            <div style="color:#2e7d32; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🎓 How Students Check Their Grades</div>
+                            <p style="color:#555; font-size:0.8rem; margin:0 0 10px;">Open <strong>Button 02 — Student Grade Portal</strong> and follow these steps:</p>
+                            <div style="display:grid; grid-template-columns:22px 1fr; gap:5px 10px; color:#333; font-size:0.82rem; align-items:start;">
+                                <span style="color:#2e7d32; font-weight:bold;">1</span><span>Enter your <strong>Student ID</strong> (e.g. <code style="background:#e8f5e9; padding:1px 5px; border-radius:3px;">070/23</code>)</span>
+                                <span style="color:#2e7d32; font-weight:bold;">2</span><span>Select your <strong>Classification</strong> — Regular, Extension, Weekend, Distance, or Summer</span>
+                                <span style="color:#2e7d32; font-weight:bold;">3</span><span>Select your <strong>Level</strong> — Diploma, Degree, Masters, or PhD</span>
+                                <span style="color:#2e7d32; font-weight:bold;">4</span><span>Select your <strong>Department</strong></span>
+                                <span style="color:#2e7d32; font-weight:bold;">5</span><span>Select your <strong>Academic Year</strong> and <strong>Semester</strong></span>
+                                <span style="color:#2e7d32; font-weight:bold;">6</span><span>View your grades, credit hours, grade points, and cumulative <strong>GPA</strong></span>
+                                <span style="color:#2e7d32; font-weight:bold;">7</span><span>Tap <em>Print Your GPA Results</em> to get an official report with a verification code</span>
+                            </div>
                         </div>
 
-                        <!-- 4. Core Modules -->
-                        <div style="background:#faf4ff; border-left:5px solid #9c27b0; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#6a1a8a; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">📦 4. Core System Modules</div>
-                            <ul style="color:#333; margin:0; padding-left:18px;">
-                                <li><strong>🎓 General System:</strong> Course List, Grade Table, Student List, Credit Hours manager, Student Grade Portal, and Universal Student Search.</li>
-                                <li><strong>🗄️ Database Viewer:</strong> Inspect all live data tables in real time; export the full database as a JSON backup.</li>
-                                <li><strong>📋 Registration:</strong> New student intake and re-registration workflows, with separate databases for Diploma, Degree, Masters, and PhD levels.</li>
-                                <li><strong>📝 Registrar's Office:</strong> Department permission matrix, grade upload control windows, per-department deadlines, attendance management, audit log, inter-department messaging, and staff password management.</li>
-                                <li><strong>💰 Finance:</strong> Fee structure configuration (universal, new-student, and per-department/level matrices), full payment ledger, cashier approval queue, and student self-service payment portal.</li>
-                                <li><strong>👩‍🏫 Teacher Grade Upload:</strong> Teachers upload Score File (A) and Grade File (B) per department and semester after the Registrar grants permission and within the set deadline.</li>
-                                <li><strong>🏛️ Dept Head Review:</strong> Department heads review pending teacher submissions, approve or reject them with comments, and forward approved grades to the Registrar for final posting.</li>
-                                <li><strong>🖥️ MS Office Suite:</strong> Built-in spreadsheet editor with formula support and Excel (.xlsx) export — accessible from the bottom toolbar.</li>
-                                <li><strong>🔍 Universal Search:</strong> Admins and Registrars can search any student by ID and view their full academic profile, grades, attendance, and payment history in one place.</li>
-                            </ul>
-                        </div>
-
-                        <!-- 5. GPA Calculation -->
+                        <!-- 4. GPA Scale -->
                         <div style="background:#fff8e1; border-left:5px solid #ff9800; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#e65100; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">📊 5. GPA Calculation &amp; Academic Status</div>
-                            <p style="color:#333; margin:0 0 8px;"><strong>Formula:</strong> GPA = Σ(Grade Point × Credit Hours) ÷ Σ(Credit Hours)</p>
-                            <p style="background:#fff3cd; padding:8px 12px; border-radius:5px; font-family:monospace; font-size:0.88rem; color:#5d4037; margin:0 0 10px;">A+/A = 4.0 &nbsp;|&nbsp; B+ = 3.5 &nbsp;|&nbsp; B = 3.0 &nbsp;|&nbsp; C+ = 2.5 &nbsp;|&nbsp; C = 2.0 &nbsp;|&nbsp; D = 1.0 &nbsp;|&nbsp; F = 0</p>
-                            <p style="color:#555; font-size:0.8rem; margin:0 0 8px;">The grade scale thresholds (score boundaries for each letter grade) are configurable by the Admin from the Settings panel.</p>
-                            <ul style="color:#333; margin:0; padding-left:18px;">
-                                <li><strong style="color:#1b5e20;">3.50 – 4.00 → EXCELLENT</strong> — Outstanding academic performance</li>
-                                <li><strong style="color:#0d47a1;">3.00 – 3.49 → VERY GOOD</strong> — Strong, consistent performance</li>
-                                <li><strong style="color:#e65100;">2.50 – 2.99 → GOOD</strong> — Solid academic standing</li>
-                                <li><strong style="color:#bf360c;">2.00 – 2.49 → SATISFACTORY</strong> — Meets minimum requirements</li>
-                                <li><strong style="color:#b71c1c;">0.00 – 1.99 → FAIL</strong> — Below passing threshold</li>
-                            </ul>
+                            <div style="color:#e65100; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">📊 GPA Scale &amp; Academic Status</div>
+                            <p style="background:#fff3cd; padding:8px 12px; border-radius:5px; font-family:monospace; font-size:0.85rem; color:#5d4037; margin:0 0 12px;">A+ / A = 4.0 &nbsp;|&nbsp; B+ = 3.5 &nbsp;|&nbsp; B = 3.0 &nbsp;|&nbsp; C+ = 2.5 &nbsp;|&nbsp; C = 2.0 &nbsp;|&nbsp; D = 1.0 &nbsp;|&nbsp; F = 0</p>
+                            <div style="display:flex; flex-direction:column; gap:5px; font-size:0.82rem;">
+                                <div style="display:flex; align-items:center; gap:10px;"><span style="background:#c8e6c9; color:#1b5e20; font-weight:bold; padding:3px 10px; border-radius:12px; min-width:90px; text-align:center;">3.50 – 4.00</span><span style="color:#1b5e20; font-weight:bold;">EXCELLENT</span></div>
+                                <div style="display:flex; align-items:center; gap:10px;"><span style="background:#bbdefb; color:#0d47a1; font-weight:bold; padding:3px 10px; border-radius:12px; min-width:90px; text-align:center;">3.00 – 3.49</span><span style="color:#0d47a1; font-weight:bold;">VERY GOOD</span></div>
+                                <div style="display:flex; align-items:center; gap:10px;"><span style="background:#ffe0b2; color:#e65100; font-weight:bold; padding:3px 10px; border-radius:12px; min-width:90px; text-align:center;">2.50 – 2.99</span><span style="color:#e65100; font-weight:bold;">GOOD</span></div>
+                                <div style="display:flex; align-items:center; gap:10px;"><span style="background:#ffccbc; color:#bf360c; font-weight:bold; padding:3px 10px; border-radius:12px; min-width:90px; text-align:center;">2.00 – 2.49</span><span style="color:#bf360c; font-weight:bold;">SATISFACTORY</span></div>
+                                <div style="display:flex; align-items:center; gap:10px;"><span style="background:#ffcdd2; color:#b71c1c; font-weight:bold; padding:3px 10px; border-radius:12px; min-width:90px; text-align:center;">0.00 – 1.99</span><span style="color:#b71c1c; font-weight:bold;">FAIL</span></div>
+                            </div>
+                            <p style="color:#888; font-size:0.75rem; margin:10px 0 0;">Score-to-grade boundaries are set by the Admin in the Grade Scale panel.</p>
                         </div>
 
-                        <!-- 6. Grade Upload Workflow -->
+                        <!-- 5. Grade Upload Flow -->
                         <div style="background:#e8f5e9; border-left:5px solid #388e3c; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#1b5e20; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">📤 6. Grade Upload Workflow</div>
-                            <ul style="color:#333; margin:0; padding-left:18px;">
-                                <li><strong>Step 1 — Registrar Opens Window:</strong> The Registrar (Button 05) enables grade upload permission per department and sets an optional deadline via the Dept Permissions panel.</li>
-                                <li><strong>Step 2 — Teacher Uploads:</strong> The Teacher (Button 06) selects their department, Classification, Level, Year, and Semester, then uploads Score File (A) and Grade File (B) in .xlsx or .csv format and submits for review.</li>
-                                <li><strong>Step 3 — Dept Head Reviews:</strong> The Department Head (Button 07) sees the pending submission, reviews it, and either approves (forwarding to the Registrar) or rejects it with comments returned to the Teacher.</li>
-                                <li><strong>Step 4 — Registrar Commits:</strong> The Registrar receives the Dept Head-approved grades and commits them to the official live database, making them visible to students.</li>
-                                <li>All four steps are automatically recorded in the <strong>Audit Log</strong> with user and timestamp.</li>
-                            </ul>
+                            <div style="color:#1b5e20; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">📤 How Grades Get Into the System</div>
+                            <div style="display:grid; grid-template-columns:28px 1fr; gap:8px 10px; font-size:0.82rem; color:#333; align-items:start;">
+                                <div style="background:#4caf50; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem; flex-shrink:0;">1</div>
+                                <div><strong>Registrar opens the upload window</strong> for the relevant department (Button 05 → Dept Permissions).</div>
+                                <div style="background:#4caf50; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem; flex-shrink:0;">2</div>
+                                <div><strong>Teacher uploads scores and grades</strong> for their department and semester (Button 06), then submits for review.</div>
+                                <div style="background:#4caf50; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem; flex-shrink:0;">3</div>
+                                <div><strong>Department Head reviews</strong> the submission and either approves or rejects it (Button 07). Rejected submissions go back to the teacher.</div>
+                                <div style="background:#4caf50; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem; flex-shrink:0;">4</div>
+                                <div><strong>Registrar commits the grades</strong> to the live system (Button 05 → Dept Data). Students can then view their results.</div>
+                            </div>
+                            <p style="color:#555; font-size:0.78rem; margin:10px 0 0;">Every step is recorded in the Audit Log with the user's name and a timestamp.</p>
                         </div>
 
-                        <!-- 7. Security & Data -->
+                        <!-- 6. Important Notes -->
                         <div style="background:#ffeef0; border-left:5px solid #e53935; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#c62828; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🔒 7. Security &amp; Data Integrity</div>
-                            <ul style="color:#333; margin:0; padding-left:18px;">
-                                <li><strong>SHA-256 Password Hashing:</strong> All role passwords (Admin, Registrar, Cashier, Finance Head, Teacher, Dept Head, Server Access) are hashed before cloud storage — never stored in plain text.</li>
-                                <li><strong>Audit Log:</strong> Every login, data upload, grade commit, and payment approval is time-stamped and permanently recorded in Firebase — cannot be deleted by any role.</li>
-                                <li><strong>Real-Time Sync:</strong> Firebase live listeners push updates to all open sessions simultaneously — no manual refresh required.</li>
-                                <li><strong>Verification Code:</strong> Every printed GPA report contains a unique official verification code that can be authenticated at the Registrar's Office.</li>
-                                <li><strong>Per-Department Deadlines:</strong> The Registrar can set individual upload deadlines per department; the system automatically closes upload access when deadlines pass.</li>
-                                <li>Each user is solely responsible for keeping their <strong>credentials and Student ID confidential</strong>.</li>
-                            </ul>
-                        </div>
-
-                        <!-- 8. Technical Info -->
-                        <div style="background:#f5f5f5; border-left:5px solid #607d8b; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#37474f; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">⚙️ 8. Technical Information</div>
-                            <ul style="color:#444; margin:0; padding-left:18px;">
-                                <li><strong>Platform:</strong> Fully browser-based — works on any modern desktop or mobile browser; no app installation required.</li>
-                                <li><strong>Backend:</strong> Firebase Firestore (real-time cloud database) — project: rvu-hmi-system.</li>
-                                <li><strong>File Support:</strong> .XLSX, .XLS, .CSV for grade, score, and student data uploads; JSON for full database export/import.</li>
-                                <li><strong>Languages:</strong> English, Afaan Oromoo, Amharic — toggle button in the top header bar.</li>
-                                <li><strong>Architecture:</strong> Single self-contained HTML file — no web server, backend code, or installation needed.</li>
-                                <li><strong>Technologies:</strong> HTML5, CSS3, Vanilla JavaScript, Firebase Firestore SDK, SheetJS (xlsx).</li>
-                                <li><strong>Navigation:</strong> 3-tier HMI — top panel selector → sub-panel tabs → content area.</li>
-                                <li><strong>Bottom Toolbar:</strong> Quick-access bar with ⚙️ Settings (User Guide), 🖥️ Description, ⚖️ Rules, and 🏠 Home.</li>
-                            </ul>
+                            <div style="color:#c62828; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">⚠️ Important Notes</div>
+                            <div style="color:#444; font-size:0.82rem; line-height:1.9;">
+                                <div>🔑 Keep your password or Student ID confidential — do not share it with anyone.</div>
+                                <div>⏰ Grade uploads close automatically when the Registrar's deadline passes — submit on time.</div>
+                                <div>🖨️ Printed GPA reports include a unique verification code that can be confirmed at the Registrar's Office.</div>
+                                <div>🔄 The system updates in real time — if data changes, refresh the page to see the latest results.</div>
+                            </div>
                         </div>
 
                         <!-- Footer -->
@@ -2348,118 +2331,213 @@
     <button id="stab-scores"   style="display:none;"></button>
     <button id="stab-credits"  style="display:none;"></button>
 
-    <div id="settingsOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.88); z-index:700; overflow-y:auto;">
-        <div style="max-width:600px; margin:30px auto 60px; background:#1a1a1a; border:1px solid #333; border-radius:14px; padding:28px 26px; color:#e0e0e0; font-family:'Segoe UI',sans-serif;">
+    <div id="settingsOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:700; overflow-y:auto;">
+        <div style="max-width:620px; margin:24px auto 60px; background:#141414; border:1px solid #2a2a2a; border-radius:16px; padding:28px 22px; color:#e0e0e0; font-family:'Segoe UI',sans-serif;">
 
-            <!-- Header -->
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; gap:12px;">
+            <!-- ── HEADER ── -->
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; gap:12px;">
                 <div>
-                    <h2 style="color:#00a2ff; margin:0 0 4px; font-size:1.15rem;">⚙ System Settings — User Guide</h2>
-                    <p style="color:#666; font-size:0.75rem; margin:0;">How to access every part of the BODU HMI System</p>
+                    <h2 style="color:#00a2ff; margin:0 0 5px; font-size:1.2rem; letter-spacing:0.3px;">📖 System User Guide</h2>
+                    <p style="color:#555; font-size:0.75rem; margin:0; line-height:1.5;">Everything you need to use the BODU HMI System — <em>read top to bottom the first time.</em></p>
                 </div>
-                <button onclick="closeSettings()" style="background:#cc0000; color:white; border:none; padding:7px 16px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:12px; flex:none; text-transform:none; letter-spacing:0;">✕ CLOSE</button>
+                <button onclick="closeSettings()" style="background:#1e1e1e; color:#aaa; border:1px solid #333; padding:7px 14px; border-radius:8px; cursor:pointer; font-size:12px; flex:none; white-space:nowrap;">✕ Close</button>
             </div>
 
-            <!-- ── SECTION 1: Navigation Overview ── -->
-            <div style="background:#0d1f0d; border:1px solid #2e7d32; border-radius:10px; padding:16px; margin-bottom:14px;">
-                <div style="color:#4caf50; font-weight:bold; font-size:0.9rem; margin-bottom:10px;">🧭 How to Navigate the System</div>
-                <div style="color:#aaa; font-size:0.8rem; line-height:1.8;">
-                    <div style="margin-bottom:6px;">• The <strong style="color:#fff;">bottom navigation bar</strong> is your main entry point. It contains: <strong style="color:#00a2ff;">Home</strong>, <strong style="color:#ffd700;">⚙ Settings</strong>, <strong style="color:#ce93d8;">Description</strong>, and <strong style="color:#4caf50;">Rules</strong>.</div>
-                    <div style="margin-bottom:6px;">• Tap <strong style="color:#fff;">Home</strong> to return to the main menu at any time.</div>
-                    <div>• Tap the <strong style="color:#ffd700;">⚙ Settings</strong> button (bottom bar) to open this guide.</div>
-                </div>
-            </div>
-
-            <!-- ── SECTION 2: Main Menu Panels ── -->
-            <div style="background:#001a33; border:1px solid #005a9e; border-radius:10px; padding:16px; margin-bottom:14px;">
-                <div style="color:#00a2ff; font-weight:bold; font-size:0.9rem; margin-bottom:10px;">🏠 Main Menu — Panel Access</div>
-                <div style="font-size:0.8rem; line-height:1.9; color:#aaa;">
-                    <div style="margin-bottom:4px;"><span style="color:#ffd700; font-weight:bold;">Button 01 — General System</span><br>
-                        &nbsp;&nbsp;Tap it to browse: Course List, Grade Table, Student List, Credits, Student Grade Portal. Select Year → Semester → view data.</div>
-                    <div style="margin-bottom:4px;"><span style="color:#4caf50; font-weight:bold;">Button 02 — Student Grade Portal</span><br>
-                        &nbsp;&nbsp;Students enter their <strong style="color:#fff;">Student ID</strong>, choose Year &amp; Semester, then tap <em>View GPA Results</em>.</div>
-                    <div style="margin-bottom:4px;"><span style="color:#00e5e5; font-weight:bold;">Button 03 — Cashier Office</span><br>
-                        &nbsp;&nbsp;Login with the Cashier password. Search a student ID to view and record fee payments.</div>
-                    <div style="margin-bottom:4px;"><span style="color:#ffae00; font-weight:bold;">Button 04 — Finance Head</span><br>
-                        &nbsp;&nbsp;Login with the Finance Head password to review all financial records and reports.</div>
-                    <div style="margin-bottom:4px;"><span style="color:#ce93d8; font-weight:bold;">Button 05 — Registrar's Office</span><br>
-                        &nbsp;&nbsp;Login with the Registrar/Admin password. Manage dept permissions, data, attendance, audit log, messages, and passwords.</div>
-                    <div style="margin-bottom:4px;"><span style="color:#81c784; font-weight:bold;">Button 06 — Teacher Grade Upload</span><br>
-                        &nbsp;&nbsp;Login with the Teacher password. Select your department, fill Step 1 (Classification/Level/Year/Semester), upload Score &amp; Grade files, then submit to department.</div>
-                    <div style="margin-bottom:4px;"><span style="color:#ce93d8; font-weight:bold;">Button 07 — Department Head</span><br>
-                        &nbsp;&nbsp;Login with your department password. Review pending teacher submissions, approve or reject, then forward to the Registrar.</div>
-                    <div><span style="color:#f48fb1; font-weight:bold;">Button 08 — Admin Panel</span><br>
-                        &nbsp;&nbsp;Login with the Admin password. Full system control: data upload, user management, permissions, audit logs, and all settings.</div>
+            <!-- ── QUICK-START CALLOUT ── -->
+            <div style="background:linear-gradient(135deg,#002244,#001a33); border-left:4px solid #00a2ff; border-radius:10px; padding:14px 16px; margin-bottom:20px;">
+                <div style="color:#00c8ff; font-weight:bold; font-size:0.85rem; margin-bottom:6px;">⚡ Quick Start — 3 Things to Know</div>
+                <div style="color:#aaa; font-size:0.8rem; line-height:1.9;">
+                    <div>① Use the <strong style="color:#fff;">bottom bar</strong> to move between Home, Settings, Description, and Rules.</div>
+                    <div>② Each main button on the Home screen opens a different <strong style="color:#fff;">role panel</strong> — only log in to the one for your role.</div>
+                    <div>③ Every panel requires a <strong style="color:#fff;">password</strong> except the Student Grade Portal (students use their Student ID).</div>
                 </div>
             </div>
 
-            <!-- ── SECTION 3: Grade Scale ── -->
-            <div style="background:#1a1500; border:1px solid #ffd700; border-radius:10px; padding:16px; margin-bottom:14px;">
-                <div style="color:#ffd700; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">⚙ Grade Scale Settings</div>
-                <div style="color:#aaa; font-size:0.8rem; line-height:1.8;">
-                    <div style="margin-bottom:4px;">To configure score thresholds (A+, A, B+, B, C+, C, D, F):</div>
-                    <div style="margin-bottom:4px;">&nbsp;&nbsp;1. Open the <strong style="color:#fff;">Admin Panel</strong> (Button 08) and log in.</div>
-                    <div>&nbsp;&nbsp;2. Navigate to <strong style="color:#ffd700;">Grade Scale</strong> inside the admin dashboard to set or update all grade boundaries.</div>
+            <!-- ── SECTION 1: Navigation ── -->
+            <div style="margin-bottom:6px;">
+                <div style="color:#4caf50; font-size:0.7rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🧭 Navigation</div>
+            </div>
+            <div style="background:#0c1c0c; border:1px solid #2a4a2a; border-radius:10px; padding:16px; margin-bottom:18px;">
+                <div style="font-size:0.82rem; line-height:2; color:#bbb;">
+                    <div>📌 <strong style="color:#fff;">Home</strong> — Returns you to the main menu from anywhere in the system.</div>
+                    <div>⚙ <strong style="color:#ffd700;">Settings</strong> — Opens this guide.</div>
+                    <div>🖥️ <strong style="color:#ce93d8;">Description</strong> — Shows a description of the current panel.</div>
+                    <div>⚖️ <strong style="color:#4caf50;">Rules</strong> — Displays the system rules and policies.</div>
                 </div>
             </div>
 
-            <!-- ── SECTION 4: Data Upload ── -->
-            <div style="background:#1a0a00; border:1px solid #ff6d00; border-radius:10px; padding:16px; margin-bottom:14px;">
-                <div style="color:#ff9800; font-weight:bold; font-size:0.9rem; margin-bottom:10px;">📤 How to Upload Data (Students, Grades, Scores, Credits)</div>
-                <div style="color:#aaa; font-size:0.8rem; line-height:1.8;">
-                    <div style="margin-bottom:6px;">All data uploads are done through the <strong style="color:#f48fb1;">Admin Panel</strong> (Button 08):</div>
-                    <div style="margin-bottom:4px;">&nbsp;&nbsp;• <strong style="color:#4caf50;">👤 Students tab</strong> — Upload or update the student list.<br>&nbsp;&nbsp;&nbsp;&nbsp;Required columns: <code style="color:#00a2ff;">student id</code>, <code style="color:#00a2ff;">full name</code>, <code style="color:#00a2ff;">classification</code>, <code style="color:#00a2ff;">level</code>, <code style="color:#00a2ff;">department</code>, <code style="color:#00a2ff;">year</code>, <code style="color:#00a2ff;">semester</code>.</div>
-                    <div style="margin-bottom:4px;">&nbsp;&nbsp;• <strong style="color:#00a2ff;">📊 Grades tab</strong> — Upload letter grades per student per course.<br>&nbsp;&nbsp;&nbsp;&nbsp;Required: <code style="color:#00a2ff;">student id</code> + one column per course (A+, A, B+, B, C+, C, D, F).</div>
-                    <div style="margin-bottom:4px;">&nbsp;&nbsp;• <strong style="color:#ce93d8;">📋 Scores tab</strong> — Upload numeric scores (0–100) per student per course.<br>&nbsp;&nbsp;&nbsp;&nbsp;Required: <code style="color:#00a2ff;">student id</code> + one column per course.</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#ffae00;">🎓 Credits tab</strong> — Upload course credit hours.<br>&nbsp;&nbsp;&nbsp;&nbsp;Required: <code style="color:#00a2ff;">course</code>, <code style="color:#00a2ff;">credits</code> (must be 2, 3, or 4).</div>
-                </div>
-                <div style="margin-top:10px; background:#111; border-radius:7px; padding:10px 12px;">
-                    <div style="color:#ffae00; font-size:0.78rem; font-weight:bold; margin-bottom:4px;">📌 Upload New vs Update Existing</div>
-                    <div style="color:#888; font-size:0.76rem; line-height:1.7;">
-                        <strong style="color:#aaa;">Upload New</strong>: Replaces all existing records for that section with file data.<br>
-                        <strong style="color:#aaa;">Update Existing</strong>: Merges — updates matching IDs/courses, adds new ones without removing others.
+            <!-- ── SECTION 2: Role Panels ── -->
+            <div style="margin-bottom:6px;">
+                <div style="color:#00a2ff; font-size:0.7rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🏠 Who Uses Which Panel?</div>
+            </div>
+            <div style="background:#00101e; border:1px solid #003a5c; border-radius:10px; padding:16px; margin-bottom:18px;">
+                <div style="font-size:0.82rem; color:#bbb;">
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
+                        <div style="min-width:26px; height:26px; background:#1a1400; border:1px solid #ffd700; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#ffd700; flex-shrink:0;">01</div>
+                        <div>
+                            <div style="color:#ffd700; font-weight:bold; margin-bottom:2px;">General System</div>
+                            <div style="color:#888; font-size:0.78rem;">Browse course lists, grade tables, student lists, and credits. No password needed — just pick Year &amp; Semester to view data.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
+                        <div style="min-width:26px; height:26px; background:#0a1a0a; border:1px solid #4caf50; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#4caf50; flex-shrink:0;">02</div>
+                        <div>
+                            <div style="color:#4caf50; font-weight:bold; margin-bottom:2px;">Student Grade Portal</div>
+                            <div style="color:#888; font-size:0.78rem;">For <strong style="color:#fff;">students</strong>. Enter your <strong style="color:#fff;">Student ID</strong>, select Year &amp; Semester, then tap <em>View GPA Results</em> to see your grades and GPA.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
+                        <div style="min-width:26px; height:26px; background:#001a1a; border:1px solid #00e5e5; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#00e5e5; flex-shrink:0;">03</div>
+                        <div>
+                            <div style="color:#00e5e5; font-weight:bold; margin-bottom:2px;">Cashier Office</div>
+                            <div style="color:#888; font-size:0.78rem;">For <strong style="color:#fff;">cashiers</strong>. Log in with the Cashier password, then search a Student ID to view and record fee payments.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
+                        <div style="min-width:26px; height:26px; background:#1a1000; border:1px solid #ffae00; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#ffae00; flex-shrink:0;">04</div>
+                        <div>
+                            <div style="color:#ffae00; font-weight:bold; margin-bottom:2px;">Finance Head</div>
+                            <div style="color:#888; font-size:0.78rem;">For the <strong style="color:#fff;">Finance Head</strong>. Log in to review all payment records and financial reports.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
+                        <div style="min-width:26px; height:26px; background:#180028; border:1px solid #ce93d8; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#ce93d8; flex-shrink:0;">05</div>
+                        <div>
+                            <div style="color:#ce93d8; font-weight:bold; margin-bottom:2px;">Registrar's Office</div>
+                            <div style="color:#888; font-size:0.78rem;">For the <strong style="color:#fff;">Registrar or Admin</strong>. Manage department permissions, review submissions, track attendance, read audit logs, and update passwords.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
+                        <div style="min-width:26px; height:26px; background:#0a1a0a; border:1px solid #81c784; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#81c784; flex-shrink:0;">06</div>
+                        <div>
+                            <div style="color:#81c784; font-weight:bold; margin-bottom:2px;">Teacher Grade Upload</div>
+                            <div style="color:#888; font-size:0.78rem;">For <strong style="color:#fff;">teachers</strong>. Log in, select your department, choose the year &amp; semester, upload your score and grade files, then submit to your department head.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
+                        <div style="min-width:26px; height:26px; background:#180028; border:1px solid #ce93d8; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#ce93d8; flex-shrink:0;">07</div>
+                        <div>
+                            <div style="color:#ce93d8; font-weight:bold; margin-bottom:2px;">Department Head</div>
+                            <div style="color:#888; font-size:0.78rem;">For <strong style="color:#fff;">department heads</strong>. Log in with your department password to review teacher submissions, then approve or reject and forward to the Registrar.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0;">
+                        <div style="min-width:26px; height:26px; background:#1a0018; border:1px solid #f48fb1; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#f48fb1; flex-shrink:0;">08</div>
+                        <div>
+                            <div style="color:#f48fb1; font-weight:bold; margin-bottom:2px;">Admin Panel</div>
+                            <div style="color:#888; font-size:0.78rem;">For the <strong style="color:#fff;">system administrator</strong>. Full access: upload all data, manage all users, configure grades, view logs, and control all system settings.</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ── SECTION 5: Teacher Flow ── -->
-            <div style="background:#0d2a0d; border:1px solid #388e3c; border-radius:10px; padding:16px; margin-bottom:14px;">
-                <div style="color:#81c784; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">👩‍🏫 Teacher Grade Submission Flow</div>
-                <div style="color:#aaa; font-size:0.8rem; line-height:1.9;">
-                    <div><strong style="color:#fff;">Step 1</strong> — Open Button 06 (Teacher Grade Upload) and enter the Teacher password.</div>
-                    <div><strong style="color:#fff;">Step 2</strong> — Select your department from the dropdown. (Only departments permitted by the Registrar will be available.)</div>
-                    <div><strong style="color:#fff;">Step 3</strong> — Choose Classification, Level, Academic Year, and Semester.</div>
-                    <div><strong style="color:#fff;">Step 4</strong> — Upload <em style="color:#00a2ff;">File A</em> (numeric scores) and <em style="color:#4caf50;">File B</em> (letter grades) as .xlsx or .csv.</div>
-                    <div><strong style="color:#fff;">Step 5</strong> — Review the preview table and tap <strong style="color:#4caf50;">Submit to Department</strong>.</div>
-                    <div><strong style="color:#fff;">Step 6</strong> — The Department Head reviews and forwards to the Registrar for final approval.</div>
+            <!-- ── SECTION 3: Teacher Steps ── -->
+            <div style="margin-bottom:6px;">
+                <div style="color:#81c784; font-size:0.7rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">👩‍🏫 Teachers — How to Submit Grades</div>
+            </div>
+            <div style="background:#0a1e0a; border:1px solid #2a4a2a; border-radius:10px; padding:16px; margin-bottom:18px;">
+                <div style="font-size:0.82rem; color:#bbb; line-height:1.6;">
+                    <div style="display:grid; grid-template-columns:24px 1fr; gap:6px 10px; align-items:start;">
+                        <div style="color:#4caf50; font-weight:bold; text-align:center; margin-top:2px;">1</div><div>Open <strong style="color:#fff;">Button 06</strong> and enter the <strong style="color:#fff;">Teacher password</strong>.</div>
+                        <div style="color:#4caf50; font-weight:bold; text-align:center; margin-top:2px;">2</div><div>Select your <strong style="color:#fff;">department</strong> from the dropdown. (Departments locked by the Registrar won't appear.)</div>
+                        <div style="color:#4caf50; font-weight:bold; text-align:center; margin-top:2px;">3</div><div>Choose <strong style="color:#fff;">Classification</strong>, <strong style="color:#fff;">Level</strong>, <strong style="color:#fff;">Academic Year</strong>, and <strong style="color:#fff;">Semester</strong>.</div>
+                        <div style="color:#4caf50; font-weight:bold; text-align:center; margin-top:2px;">4</div><div>Upload <strong style="color:#00a2ff;">File A</strong> (numeric scores, 0–100) and <strong style="color:#4caf50;">File B</strong> (letter grades) in .xlsx or .csv format.</div>
+                        <div style="color:#4caf50; font-weight:bold; text-align:center; margin-top:2px;">5</div><div>Check the preview table to confirm the data looks correct.</div>
+                        <div style="color:#4caf50; font-weight:bold; text-align:center; margin-top:2px;">6</div><div>Tap <strong style="color:#4caf50;">Submit to Department</strong>. Your department head will review and forward to the Registrar.</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- ── SECTION 6: Registrar Flow ── -->
-            <div style="background:#1a0030; border:1px solid #7b1fa2; border-radius:10px; padding:16px; margin-bottom:14px;">
-                <div style="color:#ce93d8; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">📋 Registrar Office — What You Can Do</div>
-                <div style="color:#aaa; font-size:0.8rem; line-height:1.8;">
-                    <div style="margin-bottom:3px;">Open Button 05 and log in with the Registrar or Admin password. Inside the dashboard:</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#ce93d8;">🏛️ Dept Permissions</strong> — Enable or disable grade upload per department, set deadlines.</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#00a2ff;">📂 Dept Data</strong> — Review pending grade submissions from departments.</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#26c6da;">📅 Attendance</strong> — View and manage attendance records.</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#4caf50;">📊 Audit Log</strong> — Full history of all system actions.</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#00e5e5;">📨 Dept Messages</strong> — Read messages sent from departments.</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#ce93d8;">🔑 My Password</strong> — Change the Registrar password.</div>
-                    <div>&nbsp;&nbsp;• <strong style="color:#81c784;">👩‍🏫 Teacher Password</strong> — Change the shared teacher password.</div>
+            <!-- ── SECTION 4: Registrar Guide ── -->
+            <div style="margin-bottom:6px;">
+                <div style="color:#ce93d8; font-size:0.7rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📋 Registrar — What You Can Do</div>
+            </div>
+            <div style="background:#160020; border:1px solid #4a1a5e; border-radius:10px; padding:16px; margin-bottom:18px;">
+                <div style="font-size:0.82rem; color:#bbb; line-height:2;">
+                    <div>🏛️ <strong style="color:#ce93d8;">Dept Permissions</strong> — Turn grade uploading on or off per department, and set submission deadlines.</div>
+                    <div>📂 <strong style="color:#00a2ff;">Dept Data</strong> — Review grade submissions waiting for your approval.</div>
+                    <div>📅 <strong style="color:#26c6da;">Attendance</strong> — View and manage student attendance records.</div>
+                    <div>📊 <strong style="color:#4caf50;">Audit Log</strong> — See a full timestamped history of every action in the system.</div>
+                    <div>📨 <strong style="color:#00e5e5;">Dept Messages</strong> — Read messages sent to you from departments.</div>
+                    <div>🔑 <strong style="color:#ce93d8;">My Password</strong> — Change your own Registrar password.</div>
+                    <div>👩‍🏫 <strong style="color:#81c784;">Teacher Password</strong> — Change the shared password used by all teachers.</div>
+                </div>
+            </div>
+
+            <!-- ── SECTION 5: Data Upload ── -->
+            <div style="margin-bottom:6px;">
+                <div style="color:#ff9800; font-size:0.7rem; font-weight:bold; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">📤 Admin — How to Upload Data</div>
+            </div>
+            <div style="background:#180800; border:1px solid #4a2800; border-radius:10px; padding:16px; margin-bottom:14px;">
+                <div style="color:#888; font-size:0.8rem; margin-bottom:12px;">All data uploads are handled inside the <strong style="color:#f48fb1;">Admin Panel (Button 08)</strong>. Open the matching tab for what you want to upload:</div>
+
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:0.8rem;">
+                    <div style="background:#1a1000; border-radius:8px; padding:10px 12px;">
+                        <div style="color:#4caf50; font-weight:bold; margin-bottom:4px;">👤 Students Tab</div>
+                        <div style="color:#888;">Upload the student list. Required columns:<br>
+                        <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">student id</code>&nbsp;
+                        <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">full name</code>&nbsp;
+                        <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">classification</code>&nbsp;
+                        <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">level</code>&nbsp;
+                        <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">department</code>&nbsp;
+                        <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">year</code>&nbsp;
+                        <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">semester</code>
+                        </div>
+                    </div>
+
+                    <div style="background:#1a1000; border-radius:8px; padding:10px 12px;">
+                        <div style="color:#00a2ff; font-weight:bold; margin-bottom:4px;">📊 Grades Tab</div>
+                        <div style="color:#888;">Upload letter grades per student per course. Required: <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">student id</code> + one column per course. Grade values: <strong style="color:#fff;">A+, A, B+, B, C+, C, D, F</strong>.</div>
+                    </div>
+
+                    <div style="background:#1a1000; border-radius:8px; padding:10px 12px;">
+                        <div style="color:#ce93d8; font-weight:bold; margin-bottom:4px;">📋 Scores Tab</div>
+                        <div style="color:#888;">Upload numeric scores per student per course. Required: <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">student id</code> + one column per course. Values must be <strong style="color:#fff;">0 – 100</strong>.</div>
+                    </div>
+
+                    <div style="background:#1a1000; border-radius:8px; padding:10px 12px;">
+                        <div style="color:#ffae00; font-weight:bold; margin-bottom:4px;">🎓 Credits Tab</div>
+                        <div style="color:#888;">Upload course credit hours. Required: <code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">course</code>&nbsp;<code style="color:#00a2ff; background:#001a33; padding:1px 5px; border-radius:3px;">credits</code>. Credit values must be <strong style="color:#fff;">2, 3, or 4</strong> only.</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:12px; background:#0e0e0e; border-left:3px solid #ff9800; border-radius:0 8px 8px 0; padding:10px 12px;">
+                    <div style="color:#ffae00; font-size:0.78rem; font-weight:bold; margin-bottom:5px;">📌 Upload New vs. Update Existing — What's the difference?</div>
+                    <div style="color:#777; font-size:0.78rem; line-height:1.8;">
+                        <strong style="color:#ccc;">Upload New:</strong> Deletes all existing records for that section and replaces them with the file you upload. Use this for a fresh start.<br>
+                        <strong style="color:#ccc;">Update Existing:</strong> Keeps current records and only changes rows that match. New rows in the file are added; nothing is deleted.
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── SECTION 6: Grade Scale ── -->
+            <div style="background:#141000; border:1px solid #3a3000; border-radius:10px; padding:14px 16px; margin-bottom:18px;">
+                <div style="color:#ffd700; font-weight:bold; font-size:0.82rem; margin-bottom:6px;">⚙ Grade Scale Settings <span style="color:#555; font-weight:normal;">(Admin only)</span></div>
+                <div style="color:#888; font-size:0.8rem; line-height:1.8;">
+                    To change the score boundaries for each letter grade (A+, A, B+, etc.):<br>
+                    Open <strong style="color:#f48fb1;">Button 08 → Admin Panel</strong>, then go to the <strong style="color:#ffd700;">Grade Scale</strong> section inside the dashboard.
                 </div>
             </div>
 
             <!-- ── SECTION 7: File Format Tips ── -->
-            <div style="background:#111; border:1px solid #333; border-radius:10px; padding:16px;">
-                <div style="color:#aaa; font-weight:bold; font-size:0.85rem; margin-bottom:8px;">📄 File Format Tips</div>
-                <div style="color:#666; font-size:0.78rem; line-height:1.8;">
-                    <div>• Accepted formats: <strong style="color:#fff;">.xlsx</strong>, <strong style="color:#fff;">.xls</strong>, <strong style="color:#fff;">.csv</strong></div>
-                    <div>• First row must be column headers exactly as specified for each upload type.</div>
-                    <div>• Column names are <strong style="color:#fff;">case-insensitive</strong> but must match the required names.</div>
-                    <div>• Score values must be <strong style="color:#fff;">numeric (0–100)</strong>. Grade values must be one of: <strong style="color:#fff;">A+, A, B+, B, C+, C, D, F</strong>.</div>
-                    <div>• Credit values must be <strong style="color:#fff;">2, 3, or 4</strong> only.</div>
-                    <div>• Remove any blank rows or merged cells before uploading.</div>
+            <div style="background:#0e0e0e; border:1px solid #2a2a2a; border-radius:10px; padding:14px 16px;">
+                <div style="color:#ccc; font-weight:bold; font-size:0.82rem; margin-bottom:10px;">📄 File Format Checklist — Before You Upload</div>
+                <div style="font-size:0.8rem; color:#666; line-height:2;">
+                    <div>✅ Use <strong style="color:#fff;">.xlsx</strong>, <strong style="color:#fff;">.xls</strong>, or <strong style="color:#fff;">.csv</strong> files only.</div>
+                    <div>✅ The <strong style="color:#fff;">first row</strong> of your file must be column headers (exactly as listed above).</div>
+                    <div>✅ Column names are <strong style="color:#fff;">not case-sensitive</strong> — <em>Student ID</em> and <em>student id</em> are treated the same.</div>
+                    <div>✅ Scores must be <strong style="color:#fff;">numbers between 0 and 100</strong>.</div>
+                    <div>✅ Grades must be one of: <strong style="color:#fff;">A+&nbsp;&nbsp;A&nbsp;&nbsp;B+&nbsp;&nbsp;B&nbsp;&nbsp;C+&nbsp;&nbsp;C&nbsp;&nbsp;D&nbsp;&nbsp;F</strong></div>
+                    <div>✅ Credits must be <strong style="color:#fff;">2, 3, or 4</strong>.</div>
+                    <div>⚠️ Remove all <strong style="color:#fff;">blank rows</strong> and <strong style="color:#fff;">merged cells</strong> before uploading — they cause errors.</div>
                 </div>
             </div>
 
@@ -2490,7 +2568,7 @@
         const UI_STRINGS = {
             eng: {
                 // HMI nav tier-2
-                'nav-system':       'General System',
+                'nav-system':       'All Program',
                 // HMI tier-3 menu items
                 'menu-courselist':  'Score',
                 'menu-studentlist': 'Student List',
@@ -2776,7 +2854,7 @@
 
         function loadTier3(proj, btn) {
             document.querySelectorAll('#tier-2 button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            if (btn && btn.closest && btn.closest('#tier-2')) btn.classList.add('active');
             document.getElementById('tier-3').innerHTML = '';
             clearDrillDownRows();
             if(proj === 'System') {
@@ -2901,8 +2979,8 @@
                 });
                 document.getElementById('content-view').innerHTML = '';
             } else if (proj === 'ExamCenter') {
-                /* ── Password Gate ── */
-                if (window.EXAM_CENTER_PASSWORD && !window._examCenterSessionUnlocked) {
+                /* ── Password Gate — always show if not unlocked this session ── */
+                if (!window._examCenterSessionUnlocked) {
                     document.getElementById('content-view').innerHTML = `
                         <div style="max-width:380px;margin:40px auto 0;text-align:center;font-family:'Segoe UI',sans-serif;">
                             <div style="font-size:2.4rem;margin-bottom:10px;">🔐</div>
@@ -2972,6 +3050,16 @@
             const entered = inp ? inp.value.trim() : '';
             if (!entered) { if(err) err.textContent='❌ Please enter the password.'; return; }
             if(err) err.textContent='⏳ Verifying…';
+            /* Wait for Firebase to finish loading if needed */
+            if (!window._fbPasswordsLoaded) {
+                await new Promise(resolve => {
+                    const check = setInterval(() => { if (window._fbPasswordsLoaded) { clearInterval(check); resolve(); } }, 200);
+                    setTimeout(() => { clearInterval(check); resolve(); }, 5000); /* max 5s wait */
+                });
+            }
+            if (!window.EXAM_CENTER_PASSWORD) {
+                if(err) err.textContent='⚠️ No password set. Contact administrator.'; return;
+            }
             const hash = await sha256(entered);
             if (hash !== window.EXAM_CENTER_PASSWORD) {
                 if(err) err.textContent='❌ Incorrect password.';
@@ -2980,18 +3068,17 @@
             }
             /* ✅ Correct — unlock for this session and load the full panel */
             window._examCenterSessionUnlocked = true;
-            const btn = document.getElementById('btn-exam');
-            if(btn) loadTier3('ExamCenter', btn);
+            loadTier3('ExamCenter', null);
         }
 
         /* ── Exam Center Log Out ── */
         function _examCenterLogOut() {
             window._examCenterSessionUnlocked = false;
-            /* Clear the tier-3 sub-buttons and reload the gated view */
             const t3 = document.getElementById('tier-3');
             if (t3) t3.innerHTML = '';
-            const btn = document.getElementById('btn-exam');
-            if (btn) loadTier3('ExamCenter', btn);
+            const cv = document.getElementById('content-view');
+            if (cv) cv.innerHTML = '';
+            loadTier3('ExamCenter', null);
         }
 
         /* ── Exam Center Password Helpers ── */
@@ -11573,6 +11660,7 @@ This is the first paragraph..."
                     <input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="deptUploadCourseListFile(this)">
                 </label>
                 ${_clCourseIds.length ? `<button onclick="deptClearAllCourseIds()" style="padding:6px 10px;border-radius:6px;border:1px solid #c62828;background:#1a0000;color:#ef9a9a;font-size:0.73rem;cursor:pointer;text-transform:none;letter-spacing:0;">🗑️ Clear All</button>` : ''}
+                ${_clCourseIds.length ? `<button onclick="deptOpenCreditHoursModal()" style="padding:7px 14px;border-radius:6px;border:1.5px solid #4db6ac;background:#003a36;color:#4db6ac;font-size:0.78rem;font-weight:bold;cursor:pointer;white-space:nowrap;text-transform:none;letter-spacing:0;">🎓 Enter Credit Hours</button>` : ''}
             </div>`;
 
         /* Active course ID pills */
@@ -11793,6 +11881,51 @@ This is the first paragraph..."
     function deptClearAllCourseIds() {
         _clCourseIds = [];
         deptFilterCourseList();
+    }
+
+    function deptOpenCreditHoursModal() {
+        const modal = document.getElementById('deptCreditHoursModal');
+        const fields = document.getElementById('deptCreditHoursFields');
+        const msg = document.getElementById('deptCreditHoursMsg');
+        if (!modal || !fields) return;
+        msg.textContent = '';
+        fields.innerHTML = '';
+        _clCourseIds.forEach(cid => {
+            const current = courseCredits[cid] !== undefined ? courseCredits[cid] : 3;
+            fields.innerHTML += `
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="flex:1;color:#ff9800;font-size:0.85rem;font-weight:bold;">${cid}</span>
+                <select id="deptCrHr_${cid}"
+                    style="padding:6px 10px;border-radius:6px;border:1.5px solid #4db6ac;background:#0a1a1a;color:#4db6ac;font-size:0.85rem;outline:none;cursor:pointer;">
+                    <option value="1" ${current===1?'selected':''}>1 cr. hr</option>
+                    <option value="2" ${current===2?'selected':''}>2 cr. hr</option>
+                    <option value="3" ${current===3?'selected':''}>3 cr. hr</option>
+                    <option value="4" ${current===4?'selected':''}>4 cr. hr</option>
+                    <option value="5" ${current===5?'selected':''}>5 cr. hr</option>
+                </select>
+            </div>`;
+        });
+        modal.style.display = 'flex';
+    }
+
+    async function deptSaveCreditHours() {
+        const msg = document.getElementById('deptCreditHoursMsg');
+        _clCourseIds.forEach(cid => {
+            const sel = document.getElementById('deptCrHr_' + cid);
+            if (sel) courseCredits[cid] = parseInt(sel.value, 10);
+        });
+        try {
+            await fbSave('hmi_data', 'courseCredits', { data: courseCredits });
+            msg.style.color = '#4caf50';
+            msg.textContent = '✅ Credit hours saved!';
+            setTimeout(() => {
+                document.getElementById('deptCreditHoursModal').style.display = 'none';
+                deptFilterCourseList();
+            }, 900);
+        } catch(e) {
+            msg.style.color = '#ff5252';
+            msg.textContent = '❌ Save failed. Try again.';
+        }
     }
 
     function deptUploadCourseListFile(input) {
@@ -18796,6 +18929,23 @@ function _vrApply() {
       </button>
       <div id="ecMgmtRemoveMsg" style="min-height:16px;font-size:0.78rem;margin-top:6px;"></div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ DEPT HEAD — CREDIT HOURS ENTRY MODAL ═══ -->
+<div id="deptCreditHoursModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9500;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
+  <div style="background:#060f1a;border:2px solid #4db6ac;border-radius:14px;width:100%;max-width:420px;padding:22px 20px;box-sizing:border-box;position:relative;max-height:90vh;overflow-y:auto;">
+    <button onclick="document.getElementById('deptCreditHoursModal').style.display='none'"
+      style="position:absolute;top:12px;right:12px;background:#001a18;color:#4db6ac;border:1px solid #4db6ac;border-radius:6px;padding:4px 10px;font-size:0.75rem;cursor:pointer;">✕ Close</button>
+    <div style="font-size:1.5rem;margin-bottom:6px;">🎓</div>
+    <h3 style="color:#4db6ac;margin:0 0 4px;font-size:0.95rem;letter-spacing:1px;">Enter Credit Hours</h3>
+    <p style="color:#555;font-size:0.75rem;margin:0 0 16px;">Set the credit hours for each course ID in the current list.</p>
+    <div id="deptCreditHoursFields" style="display:flex;flex-direction:column;gap:10px;"></div>
+    <div id="deptCreditHoursMsg" style="min-height:18px;font-size:0.82rem;margin-top:10px;"></div>
+    <button onclick="deptSaveCreditHours()"
+      style="margin-top:14px;width:100%;padding:10px;background:#003a36;color:#4db6ac;border:1.5px solid #4db6ac;border-radius:8px;font-size:0.9rem;font-weight:bold;cursor:pointer;">
+      💾 Save Credit Hours
+    </button>
   </div>
 </div>
 
