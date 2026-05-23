@@ -1428,7 +1428,6 @@
         #portalInner body, #portalInner { font-family: 'Segoe UI', sans-serif; }
         .portal-wrap { font-family: 'Segoe UI', sans-serif; padding: 10px; background-color: transparent; margin: 0; }
         .card { background: RebeccaPurple; padding: 25px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); max-width: 500px; margin: 20px auto; width: 95%; box-sizing: border-box; text-align: center; transition: background 0.5s ease; position: relative; }
-        .univ-logo { width: 80px; height: auto; margin-bottom: 10px; }
         .welcome-text { color: white; font-size: 0.9rem; margin-bottom: 20px; margin-top: 35px; line-height: 1.4; opacity: 0.9; }
         .footer-copy { color: pink; font-size: 0.60rem; margin-top: 50px; line-height: 1.4; clear: both; }
         .bg-report { background: black !important; }
@@ -1544,7 +1543,7 @@
         #verifyStrip { display: block; }
         @media print {
             @page { size: A4; margin: 1.5cm; }
-            .btn-load, .btn-back, #viewGpaBtn, #reportActions, .univ-logo, .welcome-text, .footer-copy, .btn-system-desc, .nav-buttons, .gpa-bottom-nav, #portalClose, .top-header, .nav-container, .bottom-nav { display: none !important; }
+            .btn-load, .btn-back, #viewGpaBtn, #reportActions, .welcome-text, .footer-copy, .btn-system-desc, .nav-buttons, .gpa-bottom-nav, #portalClose, .top-header, .nav-container, .bottom-nav { display: none !important; }
             body { background: white; padding: 2px; }
             .card { box-shadow: none; border: none; background: white !important; color: black !important; max-width: 100%; width: 100%; margin: 0; padding: 0; }
             .grade-table { background: white !important; width: 100%; margin-top: 10px; border: 1px solid black !important; border-collapse: collapse; }
@@ -1592,10 +1591,11 @@
         }
         /* Hide the Google logo text */
         #google_translate_element .goog-te-gadget-simple img { display: none !important; }
-        /* Force button label to "Select Language" regardless of page content language or Google Translate state */
-        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child,
-        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child * { font-size: 0 !important; color: transparent !important; visibility: hidden !important; }
-        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:first-child::after { content: 'Select Language' !important; font-size: 10px !important; color: #fff !important; font-weight: bold !important; visibility: visible !important; display: inline !important; }
+        /* Force button label to "Select Language" — hide ALL spans inside the value area,
+           then overlay a fixed ::before on the parent .goog-te-menu-value instead,
+           so Google Translate can never translate or overwrite it */
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span { font-size: 0 !important; color: transparent !important; visibility: hidden !important; width: 0 !important; overflow: hidden !important; }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value::before { content: 'Select Language' !important; font-size: 10px !important; color: #fff !important; font-weight: bold !important; visibility: visible !important; display: inline !important; }
         .goog-te-gadget { font-size: 0 !important; }
         .goog-te-gadget > span > a { display: none !important; }
     </style>
@@ -1616,22 +1616,19 @@
                 autoDisplay: false,
                 multilanguagePage: true
             }, 'google_translate_element');
-            /* Force button label back to "Select Language" and reset to English */
-            var _forceLabelAttempts = 0;
-            setTimeout(function forceLangLabel() {
-                _forceLabelAttempts++;
-                const span = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
-                if (span) { span.textContent = ''; }
-                /* Wipe any sibling spans that might render the language name */
-                document.querySelectorAll('#google_translate_element .goog-te-menu-value span').forEach(function(s, i) {
-                    if (i === 0) s.textContent = '';
+            /* Permanently force button label to "Select Language" using MutationObserver */
+            function _wipeTranslateSpans() {
+                document.querySelectorAll('#google_translate_element .goog-te-menu-value span').forEach(function(s) {
+                    if (s.textContent !== '') s.textContent = '';
                 });
-                const sel = document.querySelector('.goog-te-combo');
-                if (sel && sel.value !== '' && sel.value !== 'en') {
-                    sel.value = 'en';
-                    sel.dispatchEvent(new Event('change'));
+            }
+            setTimeout(function() {
+                _wipeTranslateSpans();
+                var _gtEl = document.getElementById('google_translate_element');
+                if (_gtEl && window.MutationObserver) {
+                    var _gtObs = new MutationObserver(function() { _wipeTranslateSpans(); });
+                    _gtObs.observe(_gtEl, { childList: true, subtree: true, characterData: true });
                 }
-                if (_forceLabelAttempts < 10) setTimeout(forceLangLabel, 500);
             }, 600);
         }
     </script>
@@ -1658,17 +1655,8 @@
                     selectEl.value = 'en';
                     selectEl.dispatchEvent(new Event('change'));
                 }
-                /* Restore label to "Select Language" — blank the span so CSS ::after shows */
-                var span = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
-                if (span) span.textContent = '';
-                /* Keep re-applying for a few seconds in case Google Translate re-renders */
-                var _domRetry = 0;
-                var _domRetryFn = setInterval(function() {
-                    _domRetry++;
-                    var s = document.querySelector('#google_translate_element .goog-te-menu-value span:first-child');
-                    if (s) s.textContent = '';
-                    if (_domRetry >= 10) clearInterval(_domRetryFn);
-                }, 500);
+                /* Restore label to "Select Language" — blank all spans so CSS ::before shows */
+                document.querySelectorAll('#google_translate_element .goog-te-menu-value span').forEach(function(s) { s.textContent = ''; });
             }, 1200);
         });
 
@@ -2088,7 +2076,7 @@
 
                 <div id="idSection">
                     <button class="btn-system-desc" onclick="toggleModal(true)" data-i18n="btn-sys-desc">SYSTEM DESCRIPTION</button>
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d4/Logo_of_Rift_Valley_University.png" alt="BODU Logo" style="display:none" class="univ-logo" onerror="this.style.display='none'">
+
                     <div class="welcome-text">Welcome to BODU student grade portal. To check your grade please click the next button step by step.</div>
                     <h2 data-i18n="portal-h2-id">Student Grade Portal</h2>
                     <input type="text" id="stuID" placeholder="ENTER YOUR ID" data-i18n="portal-id-placeholder">
