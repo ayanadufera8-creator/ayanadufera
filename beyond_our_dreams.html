@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title id="sysTitle">BODU Relational HMI System v75.0</title>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <title id="sysTitle">BODU Relational HMI Program v75.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -35,7 +34,7 @@
         window.resultsPortalDeadline = null; /* Date — auto-close deadline */
         window.deptExamAttendanceThresholds = window.deptExamAttendanceThresholds || {}; /* dept → minimum % to sit exam */
 
-        /* ── Exam system globals — init early so fbLoadAll can populate them
+        /* ── Exam program globals — init early so fbLoadAll can populate them
            before the later script block that declares them runs.
            Seed from localStorage cache first for instant availability,
            then Firebase will overwrite with authoritative data on load.  ── */
@@ -1328,17 +1327,12 @@
     </script>
 
     <style>
-        /* ── HMI SYSTEM STYLES ── */
+        /* ── HMI PROGRAM STYLES ── */
         body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; width: 100%; box-sizing: border-box; max-width: 100vw; }
         .top-header { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px 10px; border-bottom: 2px solid #333; width: 100%; box-sizing: border-box; }
-        .flag-box img { width: 45px; height: 30px; border: 1px solid #555; border-radius: 2px; }
-        .lang-selector { display: flex; gap: 8px; align-items: center; }
-        .lang-btn { background: #2a2a2a; border: 1px solid #444; color: #aaa; cursor: pointer; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; transition: all 0.3s ease; }
-        .lang-btn:hover { border-color: #00a2ff; color: #fff; }
-        .lang-btn.active { background: #005a9e; color: white; border-color: #0078d7; box-shadow: 0 0 10px rgba(0, 120, 215, 0.4); }
         .nav-container { padding: 0; display: flex; flex-direction: column; gap: 0; background: #161616; border-bottom: 2px solid #2a2a2a; width: 100%; box-sizing: border-box; margin-bottom: 0; }
         .nav-row { display: flex; gap: 0; min-height: 0; width: 100%; box-sizing: border-box; flex-wrap: wrap; }
-        /* tier-2 = top nav row (GENERAL SYSTEM…) → PILL / STADIUM */
+        /* tier-2 = top nav row (ALL PROGRAM…) → PILL / STADIUM */
         #tier-2 button { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(8px,1.2vw,11px); padding: 10px 4px; border-radius: 20px; clip-path: none; width: auto; min-width: 0; max-width: unset; }
         #tier-2.nav-row { gap: 4px; padding: 4px 6px; background: #111; }
         /* tier-3 = sub-nav row (COURSE LIST…) → CUT-CORNER */
@@ -1392,8 +1386,6 @@
         .dept-btn:hover { background: #2a2a2a; color: #00a2ff; border-color: #444; }
         .home-btn { flex: 1; background: linear-gradient(135deg, #cc0000 0%, #990000 100%); color: white; font-weight: bold; cursor: pointer; border: none; font-size: 11px; border-radius: 0; box-shadow: none; padding: 12px 4px 10px; }
         .home-btn:hover { background: #e60000; filter: brightness(1.1); }
-        .lang-text { display: none; }
-        .lang-text.show { display: inline; }
         .upload-box { border: 2px dashed #444; padding: 20px; text-align: center; margin-top: 20px; border-radius: 8px; background: #1a1a1a; }
         .upload-box input { display: block; margin: 10px auto; color: #aaa; }
         .cs-desc { border-left: 3px solid #00a2ff; padding: 15px; background: #252525; border-radius: 4px; }
@@ -1546,7 +1538,7 @@
         .gpa-bottom-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
         .sig-container { position: relative; display: inline-block; margin-top: 30px; margin-bottom: 40px; text-align: left; }
         .handwritten-sig { position: absolute; left: 75px; top: -10px; transform: rotate(-5deg); font-family: 'Brush Script MT', cursive; font-size: 28px; font-weight: bold; color: #2b3d8c; pointer-events: none; opacity: 0.9; letter-spacing: 1px; border: 3px solid #2b3d8c; padding: 2px 10px; white-space: nowrap; z-index: 5; }
-        .print-date { display: none; position: absolute; top: 10px; right: 20px; font-weight: bold; font-size: 14px; }
+        .print-date { display: none !important; }
         .print-footer { display: none; margin-top: 40px; text-align: center; }
         /* Verify strip visible only on print */
         #verifyStrip { display: block; }
@@ -1559,7 +1551,6 @@
             .grade-table th, .grade-table td { color: black !important; border: 1px solid black !important; background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .grade-table tr:last-child td { border-bottom: 2px solid black !important; font-weight: bold; }
             h3, #resInfo, #resDept, #resCampus, #gpaContainer, #resStatus { color: black !important; border-color: black !important; }
-            .print-date { display: block !important; color: black !important; }
             .print-footer { display: block !important; color: black !important; position: relative; width: 100%; }
             .restricted-note { text-align: left; font-size: 12px; margin-top: 20px; line-height: 1.4; }
             .handwritten-sig { color: #2b3d8c !important; -webkit-print-color-adjust: exact; border-color: #2b3d8c !important; }
@@ -1653,7 +1644,7 @@
             const ver = window.SYSTEM_VERSION || 'v75.0';
             document.querySelectorAll('.sysver').forEach(el => el.textContent = ver);
             const t = document.getElementById('sysTitle');
-            if (t) t.textContent = 'BODU Relational HMI System ' + ver;
+            if (t) t.textContent = 'BODU Relational HMI Program ' + ver;
 
             /* Force English default on every page load */
             setTimeout(function() {
@@ -1904,9 +1895,7 @@
     <div class="nav-container">
         <div id="tier-2" style="display:flex; flex-wrap:nowrap; width:100%; background:#111; gap:4px; padding:4px 6px; box-sizing:border-box; align-items:stretch;">
             <button id="btn-sys"  class="active" onclick="loadTier3('System', this)" data-i18n="nav-system" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">All Program</button>
-            <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">🗄 Database</button>
-            <button id="btn-reg"  onclick="loadTier3('RegPanel', this)" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">📋 Registration</button>
-            <button onclick="openFinanceHeadPanel()" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">💼 Finance Head</button>
+            <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">🛡️ Admin Panel</button>
             <button onclick="openDeptHeadPanel()" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">🏛️ Dept Head</button>
             <button onclick="openRegistrarPermPanel()" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">📝 Registrar</button>
             <!-- ⋯ more menu button — fixed width, always at right edge -->
@@ -1915,6 +1904,8 @@
         <!-- More Menu Dropdown -->
         <div id="moreMenuDropdown" style="display:none; position:fixed; right:4px; top:auto; z-index:9999; background:#1a1a1a; border:2px solid #5c4500; border-radius:10px; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,0.8); padding:6px;">
             <div style="color:#ffd700; font-size:9px; font-weight:bold; padding:4px 10px 6px; border-bottom:1px solid #333; letter-spacing:1px;">PANELS &amp; OFFICES</div>
+            <button id="btn-reg" onclick="loadTier3('RegPanel', this); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#ffae00; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#2a1800'" onmouseout="this.style.background='transparent'">📋 Registration</button>
+            <button onclick="openFinanceHeadPanel(); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#81c784; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#0a2a0a'" onmouseout="this.style.background='transparent'">💼 Finance Head</button>
             <button onclick="loadTier3('P6',document.getElementById('btn-p6-proxy')); closeMoreMenu();" id="btn-p6-proxy" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#ce93d8; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#2a0a4a'" onmouseout="this.style.background='transparent'">👩‍🏫 Teacher File (Get)</button>
             <button onclick="loadTier3('ExamCenter', this); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#aaa; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#1a1a1a'" onmouseout="this.style.background='transparent'">📝 Exam Center</button>
             <button onclick="openStudentFinancePortal(); closeMoreMenu();" style="display:block; width:100%; text-align:left; background:transparent; border:none; border-radius:6px; color:#ffd700; padding:8px 12px; font-size:11px; font-weight:bold; cursor:pointer; letter-spacing:0; text-transform:none;" onmouseover="this.style.background='#2a2000'" onmouseout="this.style.background='transparent'">💳 Payment Portal</button>
@@ -1927,9 +1918,7 @@
     <div id="display-area" style="padding:0; display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;">
         <div id="drill-nav-area" style="display:flex; flex-direction:column; width:100%;"></div>
         <div id="content-view" style="padding:16px; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; box-sizing:border-box;">
-            <span class="lang-text eng show">WEL COME!!</span>
-            <span class="lang-text ao">BAGA NAGAAN DHUFTAN!!</span>
-            <span class="lang-text amh">እንኳን ደህና መጡ!!</span>
+            <span>WEL COME!!</span>
         </div>
     </div>
 
@@ -1962,7 +1951,7 @@
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
                         <span style="font-size:2rem;">🖥️</span>
                         <div>
-                            <h1 style="color:#2c3e50; font-size:1.3rem; margin:0; border-bottom:2px solid #2c3e50; padding-bottom:4px;">BODU HMI System <span class="sysver">v75.0</span></h1>
+                            <h1 style="color:#2c3e50; font-size:1.3rem; margin:0; border-bottom:2px solid #2c3e50; padding-bottom:4px;">BODU HMI Program <span class="sysver">v75.0</span></h1>
                             <p style="color:#888; font-size:0.75rem; margin:4px 0 0;">Beyond Our Dreams University — Bishoftu Campus</p>
                         </div>
                     </div>
@@ -1970,23 +1959,23 @@
 
                     <div style="display:flex; flex-direction:column; gap:16px; font-size:0.85rem; line-height:1.75;">
 
-                        <!-- 1. What Is This System -->
+                        <!-- 1. What Is This Program -->
                         <div style="background:#f7f7f7; border-left:5px solid #f0b429; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#b8860b; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🏫 About This System</div>
-                            <p style="color:#333; margin:0 0 10px;">The <strong>BODU HMI System</strong> is the digital management platform for <strong>Beyond Our Dreams University, Bishoftu Campus</strong>. It handles student grades, GPA reports, fee payments, attendance, and department workflows — all in one place, updated in real time across all devices.</p>
+                            <div style="color:#b8860b; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">🏫 About This Program</div>
+                            <p style="color:#333; margin:0 0 10px;">The <strong>BODU HMI Program</strong> is the digital management platform for <strong>Beyond Our Dreams University, Bishoftu Campus</strong>. It handles student grades, GPA reports, fee payments, attendance, and department workflows — all in one place, updated in real time across all devices.</p>
                             <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                <span style="background:#fff3cd; color:#7a5000; padding:4px 10px; border-radius:20px; font-size:0.78rem;">🌐 English / Afaan Oromoo / Amharic</span>
+                                <span style="background:#fff3cd; color:#7a5000; padding:4px 10px; border-radius:20px; font-size:0.78rem;">🌐 Google Translate — Multilingual</span>
                                 <span style="background:#e8f5e9; color:#1b5e20; padding:4px 10px; border-radius:20px; font-size:0.78rem;">☁️ Real-time cloud sync</span>
                                 <span style="background:#e3f2fd; color:#0d47a1; padding:4px 10px; border-radius:20px; font-size:0.78rem;">💵 All amounts in ETB</span>
                                 <span style="background:#fce4ec; color:#880e4f; padding:4px 10px; border-radius:20px; font-size:0.78rem;">📱 Works on any browser or phone</span>
                             </div>
                         </div>
 
-                        <!-- 2. Who Uses This System -->
+                        <!-- 2. Who Uses This Program -->
                         <div style="background:#f0f7ff; border-left:5px solid #2196f3; border-radius:6px; padding:14px 16px;">
                             <div style="color:#1565c0; font-weight:bold; font-size:0.92rem; margin-bottom:10px;">🔐 Roles & Access</div>
                             <div style="display:flex; flex-direction:column; gap:7px; color:#333; font-size:0.82rem;">
-                                <div><strong style="color:#c62828;">Admin — Button 08</strong><br><span style="color:#555;">Full control of the system: upload data, manage all passwords, configure grade scale, and view all logs.</span></div>
+                                <div><strong style="color:#c62828;">Admin — Button 08</strong><br><span style="color:#555;">Full control of the program: upload data, manage all passwords, configure grade scale, and view all logs.</span></div>
                                 <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#6a1a8a;">Registrar — Button 05</strong><br><span style="color:#555;">Open or close grade upload windows per department, review submissions, manage attendance, and update staff passwords.</span></div>
                                 <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#e65100;">Finance Head — Button 04</strong><br><span style="color:#555;">Set fee amounts and view the full payment ledger.</span></div>
                                 <div style="border-top:1px solid #dce8f8; padding-top:7px;"><strong style="color:#1b5e20;">Cashier — Button 03</strong><br><span style="color:#555;">Search a student ID to record fee payments and approve payment requests.</span></div>
@@ -2027,7 +2016,7 @@
 
                         <!-- 5. Grade Upload Flow -->
                         <div style="background:#e8f5e9; border-left:5px solid #388e3c; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#1b5e20; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">📤 How Grades Get Into the System</div>
+                            <div style="color:#1b5e20; font-weight:bold; font-size:0.92rem; margin-bottom:8px;">📤 How Grades Get Into the Program</div>
                             <div style="display:grid; grid-template-columns:28px 1fr; gap:8px 10px; font-size:0.82rem; color:#333; align-items:start;">
                                 <div style="background:#4caf50; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem; flex-shrink:0;">1</div>
                                 <div><strong>Registrar opens the upload window</strong> for the relevant department (Button 05 → Dept Permissions).</div>
@@ -2036,7 +2025,7 @@
                                 <div style="background:#4caf50; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem; flex-shrink:0;">3</div>
                                 <div><strong>Department Head reviews</strong> the submission and either approves or rejects it (Button 07). Rejected submissions go back to the teacher.</div>
                                 <div style="background:#4caf50; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem; flex-shrink:0;">4</div>
-                                <div><strong>Registrar commits the grades</strong> to the live system (Button 05 → Dept Data). Students can then view their results.</div>
+                                <div><strong>Registrar commits the grades</strong> to the live program (Button 05 → Dept Data). Students can then view their results.</div>
                             </div>
                             <p style="color:#555; font-size:0.78rem; margin:10px 0 0;">Every step is recorded in the Audit Log with the user's name and a timestamp.</p>
                         </div>
@@ -2048,7 +2037,7 @@
                                 <div>🔑 Keep your password or Student ID confidential — do not share it with anyone.</div>
                                 <div>⏰ Grade uploads close automatically when the Registrar's deadline passes — submit on time.</div>
                                 <div>🖨️ Printed GPA reports include a unique verification code that can be confirmed at the Registrar's Office.</div>
-                                <div>🔄 The system updates in real time — if data changes, refresh the page to see the latest results.</div>
+                                <div>🔄 The program updates in real time — if data changes, refresh the page to see the latest results.</div>
                             </div>
                         </div>
 
@@ -2104,7 +2093,7 @@
                     <h2 data-i18n="portal-h2-id">Student Grade Portal</h2>
                     <input type="text" id="stuID" placeholder="ENTER YOUR ID" data-i18n="portal-id-placeholder">
                     <button class="btn-load" onclick="toYear()" data-i18n="btn-next">Next</button>
-                    <div class="footer-copy">©2026 BODU student grade portal system developed by Ayana Dufera. All rights reserved.</div>
+                    <div class="footer-copy">©2026 BODU student grade portal program developed by Ayana Dufera. All rights reserved.</div>
                 </div>
 
                 <div id="yearSection" style="display:none;">
@@ -2234,9 +2223,9 @@
     <div id="auditLogPanel" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9000; flex-direction:column; align-items:center; justify-content:flex-start; padding:20px; box-sizing:border-box; overflow-y:auto;">
         <div style="width:100%; max-width:900px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h2 style="color:#4fc3f7; margin:0; font-size:1.1rem;">&#128221; System Audit Log (Last 200 actions)</h2>
+                <h2 style="color:#4fc3f7; margin:0; font-size:1.1rem;">&#128221; Program Audit Log (Last 200 actions)</h2>
                 <div style="display:flex; gap:8px;">
-                    <button onclick="safePrint('System Audit Log', document.getElementById('auditLogPanel'))" style="background:#1a3a5c; color:#4fc3f7; border:1px solid #4fc3f7; border-radius:6px; padding:6px 14px; cursor:pointer; font-weight:bold; font-size:0.75rem; text-transform:none; letter-spacing:0;">🖨️ Print</button>
+                    <button onclick="safePrint('Program Audit Log', document.getElementById('auditLogPanel'))" style="background:#1a3a5c; color:#4fc3f7; border:1px solid #4fc3f7; border-radius:6px; padding:6px 14px; cursor:pointer; font-weight:bold; font-size:0.75rem; text-transform:none; letter-spacing:0;">🖨️ Print</button>
                     <button onclick="window.closeAuditLog()" style="background:#cc0000; color:white; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-weight:bold;">CLOSE</button>
                 </div>
             </div>
@@ -2260,75 +2249,9 @@
         <button onclick="window.openAuditLog()" style="display:none; background:linear-gradient(180deg,#1a6b2e,#0d4a1f); color:white; border:1px solid #4caf50; border-radius:6px; padding:5px 14px; font-size:0.75rem; font-weight:bold; cursor:pointer; flex:none; text-transform:none; letter-spacing:0;">&#128221; Audit Log</button>
     </div>
 
-    <!-- ── PASSWORD MODAL ── -->
-    <div id="passwordOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:800; align-items:center; justify-content:center;">
-        <div style="background:#1e1e1e; border:1px solid #444; border-radius:12px; padding:32px 28px; max-width:360px; width:90%; text-align:center; font-family:'Segoe UI',sans-serif;">
-            <div style="font-size:2rem; margin-bottom:10px;">🔒</div>
-            <h2 style="color:#00a2ff; margin:0 0 6px; font-size:1.1rem;" data-i18n="pw-title">Admin Access Required</h2>
-            <p style="color:#aaa; font-size:0.82rem; margin-bottom:20px;" data-i18n="pw-desc">Enter your password to access Settings.</p>
-            <input type="password" id="settingsPassword" placeholder="Enter password" data-i18n="pw-placeholder"
-                style="width:100%; padding:10px; border-radius:8px; border:2px solid #444; background:#111; color:#fff; font-size:1rem; box-sizing:border-box; text-align:center; outline:none;"
-                onkeydown="if(event.key==='Enter') checkPassword()">
-            <div id="pwError" style="color:#cc0000; font-size:0.82rem; margin-top:8px; min-height:18px;"></div>
-            <div style="display:flex; gap:10px; margin-top:16px;">
-                <button onclick="closePwModal()" style="flex:1; padding:10px; background:#333; color:#aaa; border:1px solid #444; border-radius:8px; cursor:pointer; font-size:0.88rem; text-transform:none; letter-spacing:0;" data-i18n="btn-cancel">Cancel</button>
-                <button onclick="checkPassword()" style="flex:1; padding:10px; background:#005a9e; color:white; border:1px solid #00a2ff; border-radius:8px; cursor:pointer; font-size:0.88rem; font-weight:bold; text-transform:none; letter-spacing:0;" data-i18n="btn-unlock">Unlock</button>
-            </div>
-            <hr style="border-color:#333; margin:20px 0 14px;">
-            <p style="color:#888; font-size:0.78rem; margin-bottom:8px;" data-i18n="pw-change-label">Change Password</p>
-            <input type="password" id="oldPassword0" placeholder="Current password"
-                style="width:100%; padding:8px; border-radius:8px; border:2px solid #333; background:#111; color:#fff; font-size:0.88rem; box-sizing:border-box; text-align:center; margin-bottom:8px; outline:none;">
-            <input type="password" id="newPassword1" placeholder="New password" data-i18n="pw-new-placeholder"
-                style="width:100%; padding:8px; border-radius:8px; border:2px solid #333; background:#111; color:#fff; font-size:0.88rem; box-sizing:border-box; text-align:center; margin-bottom:8px; outline:none;">
-            <input type="password" id="newPassword2" placeholder="Confirm new password" data-i18n="pw-confirm-placeholder"
-                style="width:100%; padding:8px; border-radius:8px; border:2px solid #333; background:#111; color:#fff; font-size:0.88rem; box-sizing:border-box; text-align:center; outline:none;">
-            <div id="pwChangeMsg" style="font-size:0.8rem; margin-top:8px; min-height:18px;"></div>
-            <button onclick="changePassword()" style="margin-top:10px; width:100%; padding:9px; background:#1b5e20; color:white; border:1px solid #4caf50; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:bold; text-transform:none; letter-spacing:0;" data-i18n="btn-update-pw">Update Password</button>
-        </div>
-    </div>
 
-    <!-- ── SETTINGS MODAL ── -->
-    <!-- Hidden file inputs preserved for JS compatibility -->
-    <input type="file" id="upload-students" accept=".xlsx,.xls,.csv" style="display:none;">
-    <input type="file" id="upload-grades"   accept=".xlsx,.xls,.csv" style="display:none;">
-    <input type="file" id="upload-scores"   accept=".xlsx,.xls,.csv" style="display:none;">
-    <input type="file" id="upload-credits"  accept=".xlsx,.xls,.csv" style="display:none;">
-    <!-- Hidden status spans preserved for JS compatibility -->
-    <span id="filename-students" style="display:none;"></span>
-    <span id="filename-grades"   style="display:none;"></span>
-    <span id="filename-scores"   style="display:none;"></span>
-    <span id="filename-credits"  style="display:none;"></span>
-    <span id="status-students"   style="display:none;"></span>
-    <span id="status-grades"     style="display:none;"></span>
-    <span id="status-scores"     style="display:none;"></span>
-    <span id="status-credits"    style="display:none;"></span>
-    <!-- Hidden select elements preserved for JS compatibility -->
-    <select id="gradeUploadKey" style="display:none;">
-        <option value="">-- Select Year &amp; Semester --</option>
-        <option>Year 1-Sem I</option><option>Year 1-Sem II</option><option>Year 1-Sem III</option>
-        <option>Year 2-Sem I</option><option>Year 2-Sem II</option><option>Year 2-Sem III</option>
-        <option>Year 3-Sem I</option><option>Year 3-Sem II</option><option>Year 3-Sem III</option>
-        <option>Year 4-Sem I</option><option>Year 4-Sem II</option><option>Year 4-Sem III</option>
-        <option>Year 5-Sem I</option><option>Year 5-Sem II</option><option>Year 5-Sem III</option>
-    </select>
-    <select id="scoreUploadKey" style="display:none;">
-        <option value="">-- Select Year &amp; Semester --</option>
-        <option>Year 1-Sem I</option><option>Year 1-Sem II</option><option>Year 1-Sem III</option>
-        <option>Year 2-Sem I</option><option>Year 2-Sem II</option><option>Year 2-Sem III</option>
-        <option>Year 3-Sem I</option><option>Year 3-Sem II</option><option>Year 3-Sem III</option>
-        <option>Year 4-Sem I</option><option>Year 4-Sem II</option><option>Year 4-Sem III</option>
-        <option>Year 5-Sem I</option><option>Year 5-Sem II</option><option>Year 5-Sem III</option>
-    </select>
-    <!-- Hidden tab divs preserved for JS showSettingsTab() compatibility -->
-    <div id="tab-students" class="settings-tab" style="display:none;"></div>
-    <div id="tab-grades"   class="settings-tab" style="display:none;"></div>
-    <div id="tab-scores"   class="settings-tab" style="display:none;"></div>
-    <div id="tab-credits"  class="settings-tab" style="display:none;"></div>
-    <!-- Hidden tab buttons preserved for JS showSettingsTab() active-state logic -->
-    <button id="stab-students" style="display:none;"></button>
-    <button id="stab-grades"   style="display:none;"></button>
-    <button id="stab-scores"   style="display:none;"></button>
-    <button id="stab-credits"  style="display:none;"></button>
+
+
 
     <div id="settingsOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:700; overflow-y:auto;">
         <div style="max-width:620px; margin:24px auto 60px; background:#141414; border:1px solid #2a2a2a; border-radius:16px; padding:28px 22px; color:#e0e0e0; font-family:'Segoe UI',sans-serif;">
@@ -2336,8 +2259,8 @@
             <!-- ── HEADER ── -->
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; gap:12px;">
                 <div>
-                    <h2 style="color:#00a2ff; margin:0 0 5px; font-size:1.2rem; letter-spacing:0.3px;">📖 System User Guide</h2>
-                    <p style="color:#555; font-size:0.75rem; margin:0; line-height:1.5;">Everything you need to use the BODU HMI System — <em>read top to bottom the first time.</em></p>
+                    <h2 style="color:#00a2ff; margin:0 0 5px; font-size:1.2rem; letter-spacing:0.3px;">📖 Program User Guide</h2>
+                    <p style="color:#555; font-size:0.75rem; margin:0; line-height:1.5;">Everything you need to use the BODU HMI Program — <em>read top to bottom the first time.</em></p>
                 </div>
                 <button onclick="closeSettings()" style="background:#1e1e1e; color:#aaa; border:1px solid #333; padding:7px 14px; border-radius:8px; cursor:pointer; font-size:12px; flex:none; white-space:nowrap;">✕ Close</button>
             </div>
@@ -2358,10 +2281,10 @@
             </div>
             <div style="background:#0c1c0c; border:1px solid #2a4a2a; border-radius:10px; padding:16px; margin-bottom:18px;">
                 <div style="font-size:0.82rem; line-height:2; color:#bbb;">
-                    <div>📌 <strong style="color:#fff;">Home</strong> — Returns you to the main menu from anywhere in the system.</div>
+                    <div>📌 <strong style="color:#fff;">Home</strong> — Returns you to the main menu from anywhere in the program.</div>
                     <div>⚙ <strong style="color:#ffd700;">Settings</strong> — Opens this guide.</div>
                     <div>🖥️ <strong style="color:#ce93d8;">Description</strong> — Shows a description of the current panel.</div>
-                    <div>⚖️ <strong style="color:#4caf50;">Rules</strong> — Displays the system rules and policies.</div>
+                    <div>⚖️ <strong style="color:#4caf50;">Rules</strong> — Displays the program rules and policies.</div>
                 </div>
             </div>
 
@@ -2375,7 +2298,7 @@
                     <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #0a1e2e;">
                         <div style="min-width:26px; height:26px; background:#1a1400; border:1px solid #ffd700; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#ffd700; flex-shrink:0;">01</div>
                         <div>
-                            <div style="color:#ffd700; font-weight:bold; margin-bottom:2px;">General System</div>
+                            <div style="color:#ffd700; font-weight:bold; margin-bottom:2px;">All Program</div>
                             <div style="color:#888; font-size:0.78rem;">Browse course lists, grade tables, student lists, and credits. No password needed — just pick Year &amp; Semester to view data.</div>
                         </div>
                     </div>
@@ -2432,7 +2355,7 @@
                         <div style="min-width:26px; height:26px; background:#1a0018; border:1px solid #f48fb1; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:bold; color:#f48fb1; flex-shrink:0;">08</div>
                         <div>
                             <div style="color:#f48fb1; font-weight:bold; margin-bottom:2px;">Admin Panel</div>
-                            <div style="color:#888; font-size:0.78rem;">For the <strong style="color:#fff;">system administrator</strong>. Full access: upload all data, manage all users, configure grades, view logs, and control all system settings.</div>
+                            <div style="color:#888; font-size:0.78rem;">For the <strong style="color:#fff;">program administrator</strong>. Full access: upload all data, manage all users, configure grades, view logs, and control all program settings.</div>
                         </div>
                     </div>
                 </div>
@@ -2464,7 +2387,7 @@
                     <div>🏛️ <strong style="color:#ce93d8;">Dept Permissions</strong> — Turn grade uploading on or off per department, and set submission deadlines.</div>
                     <div>📂 <strong style="color:#00a2ff;">Dept Data</strong> — Review grade submissions waiting for your approval.</div>
                     <div>📅 <strong style="color:#26c6da;">Attendance</strong> — View and manage student attendance records.</div>
-                    <div>📊 <strong style="color:#4caf50;">Audit Log</strong> — See a full timestamped history of every action in the system.</div>
+                    <div>📊 <strong style="color:#4caf50;">Audit Log</strong> — See a full timestamped history of every action in the program.</div>
                     <div>📨 <strong style="color:#00e5e5;">Dept Messages</strong> — Read messages sent to you from departments.</div>
                     <div>🔑 <strong style="color:#ce93d8;">My Password</strong> — Change your own Registrar password.</div>
                     <div>👩‍🏫 <strong style="color:#81c784;">Teacher Password</strong> — Change the shared password used by all teachers.</div>
@@ -2549,283 +2472,8 @@
         /* ════════════════════════════════════
            HMI SYSTEM DATA & FUNCTIONS
         ════════════════════════════════════ */
-        const ETH_FLAG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj4KICA8cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjIwMCIgeT0iMCIgZmlsbD0iIzA3ODkzMCIvPgogIDxyZWN0IHdpZHRoPSI5MDAiIGhlaWdodD0iMjAwIiB5PSIyMDAiIGZpbGw9IiNGQ0REMDkiLz4KICA8cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjIwMCIgeT0iNDAwIiBmaWxsPSIjREExMjFBIi8+CiAgPGNpcmNsZSBjeD0iNDUwIiBjeT0iMzAwIiByPSIxNTAiIGZpbGw9IiMwRjQ3QUYiLz4KICA8cG9seWdvbiBwb2ludHM9IjQ1MCwxODAgNDY4LDI0MyA1MzQsMjQzIDQ4MSwyODAgNTAwLDM0MyA0NTAsMzA2IDQwMCwzNDMgNDE5LDI4MCAzNjYsMjQzIDQzMiwyNDMiIGZpbGw9IiNGQ0REMDkiLz4KPC9zdmc+";
-        const ORO_FLAG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj4KICA8cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjIwMCIgeT0iMCIgZmlsbD0iI0NDMDAwMCIvPgogIDxyZWN0IHdpZHRoPSI5MDAiIGhlaWdodD0iMjAwIiB5PSIyMDAiIGZpbGw9IiNGRkZGRkYiLz4KICA8cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjIwMCIgeT0iNDAwIiBmaWxsPSIjMDAwMDAwIi8+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDUwLDMwMCkiPgogICAgPHJlY3QgeD0iLTEyIiB5PSIyMCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjkwIiBmaWxsPSIjNkIzQTJBIi8+CiAgICA8bGluZSB4MT0iLTEyIiB5MT0iMTEwIiB4Mj0iLTUwIiB5Mj0iMTQwIiBzdHJva2U9IiM2QjNBMkEiIHN0cm9rZS13aWR0aD0iMTAiLz4KICAgIDxsaW5lIHgxPSIxMiIgeTE9IjExMCIgeDI9IjUwIiB5Mj0iMTQwIiBzdHJva2U9IiM2QjNBMkEiIHN0cm9rZS13aWR0aD0iMTAiLz4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTEwIiByeD0iMTEwIiByeT0iNTUiIGZpbGw9IiMwMDdBMDAiLz4KICAgIDxlbGxpcHNlIGN4PSIwIiBjeT0iLTUwIiByeD0iODAiIHJ5PSI0NSIgZmlsbD0iIzAwOTkwMCIvPgogICAgPGVsbGlwc2UgY3g9IjAiIGN5PSItODUiIHJ4PSI1NSIgcnk9IjM1IiBmaWxsPSIjMDBCQjAwIi8+CiAgPC9nPgo8L3N2Zz4=";
-        const US_FLAG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iI0IyMjIzNCIvPjxyZWN0IHdpZHRoPSI5MDAiIGhlaWdodD0iNDYiIHk9IjQ2IiBmaWxsPSIjRkZGRkZGIi8+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI0NiIgeT0iMTM4IiBmaWxsPSIjRkZGRkZGIi8+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI0NiIgeT0iMjMwIiBmaWxsPSIjRkZGRkZGIi8+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI0NiIgeT0iMzIyIiBmaWxsPSIjRkZGRkZGIi8+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI0NiIgeT0iNDE0IiBmaWxsPSIjRkZGRkZGIi8+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI0NiIgeT0iNTA2IiBmaWxsPSIjRkZGRkZGIi8+PHJlY3Qgd2lkdGg9IjM2MCIgaGVpZ2h0PSIzMjMiIGZpbGw9IiMzQzNCNkUiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjM2IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjkwIiBjeT0iMzYiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMTUwIiBjeT0iMzYiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjEwIiBjeT0iMzYiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjcwIiBjeT0iMzYiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMzMwIiBjeT0iMzYiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iNjAiIGN5PSI3MiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIxMjAiIGN5PSI3MiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIxODAiIGN5PSI3MiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIyNDAiIGN5PSI3MiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSI3MiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjEwOCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSI5MCIgY3k9IjEwOCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIxNTAiIGN5PSIxMDgiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjEwIiBjeT0iMTA4IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjI3MCIgY3k9IjEwOCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIzMzAiIGN5PSIxMDgiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iNjAiIGN5PSIxNDQiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMTIwIiBjeT0iMTQ0IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjE4MCIgY3k9IjE0NCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIyNDAiIGN5PSIxNDQiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMzAwIiBjeT0iMTQ0IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMTgwIiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjkwIiBjeT0iMTgwIiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjE1MCIgY3k9IjE4MCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIyMTAiIGN5PSIxODAiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjcwIiBjeT0iMTgwIiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjMzMCIgY3k9IjE4MCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjIxNiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIxMjAiIGN5PSIyMTYiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMTgwIiBjeT0iMjE2IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjI0MCIgY3k9IjIxNiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIyMTYiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyNTIiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iOTAiIGN5PSIyNTIiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMTUwIiBjeT0iMjUyIiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjIxMCIgY3k9IjI1MiIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIyNzAiIGN5PSIyNTIiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMzMwIiBjeT0iMjUyIiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iMjg4IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjEyMCIgY3k9IjI4OCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIxODAiIGN5PSIyODgiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjQwIiBjeT0iMjg4IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjMwMCIgY3k9IjI4OCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjMyNCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSI5MCIgY3k9IjMyNCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIxNTAiIGN5PSIzMjQiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PGNpcmNsZSBjeD0iMjEwIiBjeT0iMzI0IiByPSIxMiIgZmlsbD0iI0ZGRkZGRiIvPjxjaXJjbGUgY3g9IjI3MCIgY3k9IjMyNCIgcj0iMTIiIGZpbGw9IiNGRkZGRkYiLz48Y2lyY2xlIGN4PSIzMzAiIGN5PSIzMjQiIHI9IjEyIiBmaWxsPSIjRkZGRkZGIi8+PC9zdmc+";
-        const languages = [
-            { code: 'eng', label: '🌐 ENG', flag: US_FLAG,  alt: 'American Flag'  },
-            { code: 'ao',  label: '🌐 AO',  flag: ORO_FLAG, alt: 'Oromo Flag'     },
-            { code: 'amh', label: '🌐 AMH', flag: ETH_FLAG, alt: 'Ethiopian Flag' }
-        ];
-        let currentLangIndex = 0;
 
-        /* ════════════════════════════════════
-           UI TRANSLATION STRINGS
-           Only system labels/buttons are translated.
-           Stored data (names, grades, courses) is NEVER translated.
-        ════════════════════════════════════ */
-        const UI_STRINGS = {
-            eng: {
-                // HMI nav tier-2
-                'nav-system':       'All Program',
-                // HMI tier-3 menu items
-                'menu-courselist':  'Score',
-                'menu-studentlist': 'Student List',
-                'menu-grade':       'Grade',
-                'menu-portal':      'Student Grade Portal',
-                // HMI tier-year-nav
-                'menu-portal-one':  'Portal One',
-                // Bottom nav
-                'btn-settings':     '⚙ Settings',
-                'btn-cs-desc':      '🖥️',
-                'btn-cs-label':     'Description',
-                'btn-home-label':   'Home',
-                'btn-law':          '⚖️',
-                'btn-law-label':    'Rules',
-                // Portal: ID section
-                'portal-h2-id':     'Student Grade Portal',
-                'portal-id-placeholder': 'ENTER YOUR ID',
-                'btn-next':         'Next',
-                // Portal: Year section
-                'portal-h2-year':   'Academic Year',
-                'portal-label-year':'Select Year:',
-                'portal-year-opt':  'Select Year',
-                'btn-back':         'BACK',
-                // Portal: Semester section
-                'portal-h2-sem':    'Semester',
-                'portal-label-sem': 'Select Semester:',
-                'portal-sem-opt':   'Select Semester',
-                'btn-view-gpa':     'VIEW YOUR GPA RESULTS',
-                // Portal: Result section
-                'btn-view-gpa2':    'VIEW YOUR GPA',
-                'btn-print':        'PRINT YOUR GPA RESULTS',
-                'btn-back-search':  'BACK TO SEARCH',
-                // Portal: GPA label
-                'label-total-gpa':  'Total GPA: ',
-                // Portal: table headers
-                'th-sn':    'S/N',
-                'th-subj':  'Subject',
-                'th-grade': 'Grade',
-                'th-crhrs': 'Cr.Hrs',
-                // System description button
-                'btn-sys-desc':     'SYSTEM DESCRIPTION',
-                // Portal close
-                'btn-portal-close': '✕ CLOSE PORTAL',
-                // Password modal
-                'pw-title':         'Admin Access Required',
-                'pw-desc':          'Enter your password to access Settings.',
-                'pw-placeholder':   'Enter password',
-                'btn-cancel':       'Cancel',
-                'btn-unlock':       'Unlock',
-                'pw-change-label':  'Change Password',
-                'pw-new-placeholder':     'New password',
-                'pw-confirm-placeholder': 'Confirm new password',
-                'btn-update-pw':    'Update Password',
-                // Action password modal
-                'action-pw-label':  'Confirm password to proceed',
-                'action-pw-desc':   'Re-enter your admin password to authorise this action.',
-                'action-pw-placeholder': 'Enter password',
-                'btn-action-cancel': 'Cancel',
-                'btn-action-confirm': '✔ Confirm',
-                // Settings modal
-                'settings-title':   '⚙ System Settings — Data Upload & Update',
-                'btn-settings-close': '✕ CLOSE',
-                'settings-desc':    'Upload Excel (.xlsx) or CSV files to upload new data or update existing data.',
-                'stab-students':    '👤 Students',
-                'stab-grades':      '📊 Grades',
-                'stab-scores':      '📋 Scores',
-                'stab-credits':     '🎓 Credits',
-                // Settings: upload buttons
-                'btn-choose-file':  '📂 Choose File',
-                'btn-upload-new':   '🔐 ⬆ Upload New',
-                'btn-update-exist': '🔐 🔄 Update Existing',
-                'no-file-chosen':   'No file chosen',
-                // Waiting message
-                'waiting-data':     '[Waiting for Data Upload]',
-                'no-data-msg':      '⚠ No data uploaded. To upload data please click setting button.',
-            },
-            ao: {
-                'nav-system':       'Sirna Waliigalaa',
-                'menu-courselist':  'Score',
-                'menu-studentlist': 'Tarree Barataa',
-                'menu-grade':       'Sadarkaa',
-                'menu-portal':      'Portaala Sadarkaa Barataa',
-                'menu-portal-one':  'Portaala Tokko',
-                'btn-settings':     '⚙ Qindaa\'ina',
-                'btn-cs-desc':      '🖥️',
-                'btn-cs-label':     'Ibsa',
-                'btn-home-label':   'Mana',
-                'btn-law':          '⚖️',
-                'btn-law-label':    'Seera',
-                'portal-h2-id':     'Portaala Sadarkaa Barataa',
-                'portal-id-placeholder': 'LAKK. BARATAA GALCHI',
-                'btn-next':         'Itti Aansu',
-                'portal-h2-year':   'Waggaa Barnootaa',
-                'portal-label-year':'Waggaa Filadhu:',
-                'portal-year-opt':  'Waggaa Filadhu',
-                'btn-back':         'DUUBATTI',
-                'portal-h2-sem':    'Xumura Waggaa',
-                'portal-label-sem': 'Xumura Waggaa Filadhu:',
-                'portal-sem-opt':   'Xumura Filadhu',
-                'btn-view-gpa':     'BU\'AAKEE ILAALI',
-                'btn-view-gpa2':    'GPA KANKEE ILAALI',
-                'btn-print':        'GPA MAXXANSI',
-                'btn-back-search':  'DEEBI\'I BARBAADI',
-                'label-total-gpa':  'GPA Waliigalaa: ',
-                'th-sn':    'L/L',
-                'th-subj':  'Mata-Duree',
-                'th-grade': 'Sadarkaa',
-                'th-crhrs': 'Sa.Kir.',
-                'btn-sys-desc':     'IBSA SIRNAA',
-                'btn-portal-close': '✕ PORTAALA CUFII',
-                'pw-title':         'Hayyama Bulchaa Barbaachisa',
-                'pw-desc':          'Jecha Darbii galchi.',
-                'pw-placeholder':   'Jecha Darbii Galchi',
-                'btn-cancel':       'Haqi',
-                'btn-unlock':       'Banaa',
-                'pw-change-label':  'Jecha Darbii Jijjiiri',
-                'pw-new-placeholder':     'Jecha Darbii Haaraa',
-                'pw-confirm-placeholder': 'Mirkaneessi',
-                'btn-update-pw':    'Haaromsi',
-                'action-pw-label':  'Jecha Darbii Mirkaneessi',
-                'action-pw-desc':   'Jecha darbii bulchaa kee galchi.',
-                'action-pw-placeholder': 'Jecha Darbii Galchi',
-                'btn-action-cancel': 'Haqi',
-                'btn-action-confirm': '✔ Mirkaneessi',
-                'settings-title':   '⚙ Qindaa\'ina Sirnaa',
-                'btn-settings-close': '✕ CUFII',
-                'settings-desc':    'Fayilii Excel ykn CSV fe\'i.',
-                'stab-students':    '👤 Barattoota',
-                'stab-grades':      '📊 Sadarkaa',
-                'stab-scores':      '📋 Qabxii',
-                'stab-credits':     '🎓 Kiriditii',
-                'btn-choose-file':  '📂 Fayilii Filadhu',
-                'btn-upload-new':   '🔐 ⬆ Haaraa Fe\'i',
-                'btn-update-exist': '🔐 🔄 Jiru Haaromsi',
-                'no-file-chosen':   'Fayiliin hin filamin',
-                'waiting-data':     '[Deetaa Fe\'uu Eegaa]',
-                'no-data-msg':      '⚠ Deetaan hin jiru. Qindaa\'ina tuqi.',
-            },
-            amh: {
-                'nav-system':       'አጠቃላይ ሥርዓት',
-                'menu-courselist':  'Score',
-                'menu-studentlist': 'የተማሪ ዝርዝር',
-                'menu-grade':       'ደረጃ',
-                'menu-portal':      'የተማሪ ደረጃ ፖርታል',
-                'menu-portal-one':  'ፖርታል አንድ',
-                'btn-settings':     '⚙ ቅንብሮች',
-                'btn-cs-desc':      '🖥️',
-                'btn-cs-label':     'መግለጫ',
-                'btn-home-label':   'መነሻ',
-                'btn-law':          '⚖️',
-                'btn-law-label':    'ደንቦች',
-                'portal-h2-id':     'የተማሪ ደረጃ ፖርታል',
-                'portal-id-placeholder': 'መታወቂያ ያስገቡ',
-                'btn-next':         'ቀጣይ',
-                'portal-h2-year':   'የትምህርት ዓመት',
-                'portal-label-year':'ዓመት ይምረጡ፦',
-                'portal-year-opt':  'ዓመት ምረጥ',
-                'btn-back':         'ተመለስ',
-                'portal-h2-sem':    'ሴሚስተር',
-                'portal-label-sem': 'ሴሚስተር ይምረጡ፦',
-                'portal-sem-opt':   'ሴሚስተር ምረጥ',
-                'btn-view-gpa':     'ውጤትዎን ይመልከቱ',
-                'btn-view-gpa2':    'GPA ይመልከቱ',
-                'btn-print':        'GPA ውጤት ያትሙ',
-                'btn-back-search':  'ወደ ፍለጋ ተመለሱ',
-                'label-total-gpa':  'ጠቅላላ GPA: ',
-                'th-sn':    'ተ.ቁ',
-                'th-subj':  'ትምህርት',
-                'th-grade': 'ደረጃ',
-                'th-crhrs': 'ክሬዲት',
-                'btn-sys-desc':     'የሥርዓት መግለጫ',
-                'btn-portal-close': '✕ ፖርታል ዝጋ',
-                'pw-title':         'የአስተዳዳሪ መዳረሻ ያስፈልጋል',
-                'pw-desc':          'የይለፍ ቃልዎን ያስገቡ።',
-                'pw-placeholder':   'የይለፍ ቃል ያስገቡ',
-                'btn-cancel':       'ሰርዝ',
-                'btn-unlock':       'ክፈት',
-                'pw-change-label':  'የይለፍ ቃል ቀይር',
-                'pw-new-placeholder':     'አዲስ የይለፍ ቃል',
-                'pw-confirm-placeholder': 'ያረጋግጡ',
-                'btn-update-pw':    'አዘምን',
-                'action-pw-label':  'የይለፍ ቃል ያረጋግጡ',
-                'action-pw-desc':   'የአስተዳዳሪ የይለፍ ቃልዎን ያስገቡ።',
-                'action-pw-placeholder': 'የይለፍ ቃል ያስገቡ',
-                'btn-action-cancel': 'ሰርዝ',
-                'btn-action-confirm': '✔ አረጋግጥ',
-                'settings-title':   '⚙ የሥርዓት ቅንብሮች',
-                'btn-settings-close': '✕ ዝጋ',
-                'settings-desc':    'Excel ወይም CSV ፋይሎችን ይስቀሉ።',
-                'stab-students':    '👤 ተማሪዎች',
-                'stab-grades':      '📊 ደረጃ',
-                'stab-scores':      '📋 ውጤቶች',
-                'stab-credits':     '🎓 ክሬዲቶች',
-                'btn-choose-file':  '📂 ፋይል ይምረጡ',
-                'btn-upload-new':   '🔐 ⬆ አዲስ ስቀል',
-                'btn-update-exist': '🔐 🔄 ያለውን አዘምን',
-                'no-file-chosen':   'ምንም ፋይል አልተመረጠም',
-                'waiting-data':     '[ዳታ ሲስቀሉ በመጠበቅ ላይ]',
-                'no-data-msg':      '⚠ ምንም ዳታ የለም። ቅንብሮችን ይጫኑ።',
-            }
-        };
 
-        function t(key) {
-            const lang = languages[currentLangIndex].code;
-            return (UI_STRINGS[lang] && UI_STRINGS[lang][key]) || UI_STRINGS.eng[key] || key;
-        }
-
-        function applyUILanguage() {
-            // Update all elements with data-i18n attribute
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                const val = t(key);
-                if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'password')) {
-                    el.placeholder = val;
-                } else if (el.tagName === 'OPTION') {
-                    el.textContent = val;
-                } else {
-                    el.textContent = val;
-                }
-            });
-        }
-
-        /* Pennant stripe definitions for the 3 languages */
-        const PENNANT_FLAGS = {
-            eng: {
-                stripes: [
-                    {y:0,h:6,fill:'#B22234'},{y:6,h:6,fill:'#FFFFFF'},{y:12,h:6,fill:'#B22234'},
-                    {y:18,h:6,fill:'#FFFFFF'},{y:24,h:6,fill:'#B22234'},{y:30,h:6,fill:'#FFFFFF'},{y:36,h:6,fill:'#B22234'}
-                ],
-                overlay: '<rect x="0" y="0" width="28" height="26" fill="#3C3B6E" clip-path="url(#langClip)"/><circle cx="7" cy="5" r="2" fill="#FFF"/><circle cx="14" cy="5" r="2" fill="#FFF"/><circle cx="21" cy="5" r="2" fill="#FFF"/><circle cx="10" cy="11" r="2" fill="#FFF"/><circle cx="17" cy="11" r="2" fill="#FFF"/><circle cx="7" cy="17" r="2" fill="#FFF"/><circle cx="14" cy="17" r="2" fill="#FFF"/><circle cx="21" cy="17" r="2" fill="#FFF"/>'
-            },
-            ao: {
-                stripes: [{y:0,h:14,fill:'#CC0000'},{y:14,h:14,fill:'#FFFFFF'},{y:28,h:14,fill:'#111111'}],
-                overlay: '<ellipse cx="36" cy="21" rx="6" ry="4" fill="#007a00" clip-path="url(#langClip)"/><ellipse cx="36" cy="18" rx="4.5" ry="3" fill="#009900" clip-path="url(#langClip)"/><rect x="35" y="22" width="2" height="4" fill="#6B3A2A" clip-path="url(#langClip)"/>'
-            },
-            amh: {
-                stripes: [{y:0,h:14,fill:'#078930'},{y:14,h:14,fill:'#FCDD09'},{y:28,h:14,fill:'#DA121A'}],
-                overlay: '<circle cx="36" cy="21" r="9" fill="#0F47AF" clip-path="url(#langClip)"/><polygon points="36,13 37.6,18 42.8,18 38.6,21 40.2,26 36,23 31.8,26 33.4,21 29.2,18 34.4,18" fill="#FCDD09" clip-path="url(#langClip)"/>'
-            }
-        };
-        function updateLangPennant(code) {
-            const def = PENNANT_FLAGS[code] || PENNANT_FLAGS.eng;
-            const cp = 'clip-path="url(#langClip)"';
-            let html = def.stripes.map(s => `<rect x="0" y="${s.y}" width="68" height="${s.h}" fill="${s.fill}" ${cp}/>`).join('');
-            html += (def.overlay || '');
-            const g = document.getElementById('langStripes');
-            if (g) g.innerHTML = html;
-        }
-        function cycleLanguage() {
-            currentLangIndex = (currentLangIndex + 1) % languages.length;
-            const lang = languages[currentLangIndex];
-            document.getElementById('langToggleBtn').innerText = lang.label;
-            updateLangPennant(lang.code);
-            document.querySelectorAll('.lang-text').forEach(el => el.classList.remove('show'));
-            document.querySelectorAll('.lang-text.' + lang.code).forEach(el => el.classList.add('show'));
-            applyUILanguage();
-        }
-        window.addEventListener('DOMContentLoaded', function() { updateLangPennant(languages[0].code); });
 
         let studentListData = []; /* populated from registrationDB on load */
 
@@ -2858,10 +2506,10 @@
             clearDrillDownRows();
             if(proj === 'System') {
                 const menuItems = [
-                    { label: t('menu-courselist'),  key: 'Course List',         color: '#ffb300', bg: 'linear-gradient(180deg,#2a1c00,#1a1100)', border: '#e65100' },
-                    { label: t('menu-studentlist'), key: 'Student List',        color: '#80deea', bg: 'linear-gradient(180deg,#00252e,#001519)', border: '#00838f' },
-                    { label: t('menu-grade'),       key: 'Grade',              color: '#a5d6a7', bg: 'linear-gradient(180deg,#0d2b0d,#061806)', border: '#2e7d32' },
-                    { label: t('menu-portal'),      key: 'Student Grade Portal', color: '#ce93d8', bg: 'linear-gradient(180deg,#1a0d2e,#0d0619)', border: '#7b1fa2' },
+                    { label: 'Score',                 key: 'Course List',          color: '#ffb300', bg: 'linear-gradient(180deg,#2a1c00,#1a1100)', border: '#e65100' },
+                    { label: 'Student List',          key: 'Student List',         color: '#80deea', bg: 'linear-gradient(180deg,#00252e,#001519)', border: '#00838f' },
+                    { label: 'Grade',                 key: 'Grade',               color: '#a5d6a7', bg: 'linear-gradient(180deg,#0d2b0d,#061806)', border: '#2e7d32' },
+                    { label: 'Student Grade Portal',  key: 'Student Grade Portal', color: '#ce93d8', bg: 'linear-gradient(180deg,#1a0d2e,#0d0619)', border: '#7b1fa2' },
                     { label: '📅 Attendance',       key: 'Attendance',         color: '#26c6da', bg: 'linear-gradient(180deg,#003a40,#001f24)', border: '#00838f' }
                 ];
                 menuItems.forEach(item => {
@@ -3022,11 +2670,6 @@
             } else if (proj === 'P1') {
                 document.getElementById('content-view').innerHTML = '';
                 openSqlViewer();
-            } else if (proj === 'P2') {
-                document.getElementById('content-view').innerHTML = '';
-                document.getElementById('tier-3').innerHTML = '';
-                /* Single Ms Office button opens the full suite directly */
-                openExcelBuilder();
             } else if (proj === 'P6') {
                 document.getElementById('content-view').innerHTML = `
                     <div style="max-width:520px; margin:16px auto 0; font-family:'Segoe UI',sans-serif;">
@@ -4129,8 +3772,7 @@
             row.style.setProperty('--drill-indent','20px');
             _area.appendChild(row);
             const b = document.createElement('button');
-            b.innerText = t('menu-portal-one');
-            b.setAttribute('data-i18n-key','menu-portal-one');
+            b.innerText = 'Portal One';
             b.onclick = () => {
                 document.querySelectorAll('#dd-portal-open button').forEach(x => x.classList.remove('active'));
                 b.classList.add('active');
@@ -4799,31 +4441,31 @@
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px; padding:0 4px;">
                         <span style="font-size:2rem;">🖥️</span>
                         <div>
-                            <h2 style="color:#ffd700; margin:0; font-size:1.15rem; letter-spacing:1px;">BODU RELATIONAL HMI SYSTEM</h2>
-                            <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">System Overview &amp; Documentation — <span class="sysver">v75.0</span></p>
+                            <h2 style="color:#ffd700; margin:0; font-size:1.15rem; letter-spacing:1px;">BODU RELATIONAL HMI PROGRAM</h2>
+                            <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">Program Overview &amp; Documentation — <span class="sysver">v75.0</span></p>
                         </div>
                     </div>
                     <hr style="border-color:#333; margin:14px 0 20px;">
 
                     <div style="display:flex; flex-direction:column; gap:16px; font-size:0.85rem; line-height:1.75;">
 
-                        <!-- 1. What Is This System -->
+                        <!-- 1. What Is This Program -->
                         <div style="background:#252525; border-left:4px solid #ffd700; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#ffd700; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">🏫 1. What Is This System?</div>
-                            <p style="color:#ccc; margin:0 0 8px;">The <strong style="color:#fff;">BODU Relational HMI System</strong> is a comprehensive, cloud-connected academic management platform built for <strong style="color:#fff;">Beyond Our Dreams University, Bishoftu Campus</strong>. It covers the complete student lifecycle — from intake registration and fee collection through grade management, GPA reporting, and multi-office administration.</p>
+                            <div style="color:#ffd700; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">🏫 1. What Is This Program?</div>
+                            <p style="color:#ccc; margin:0 0 8px;">The <strong style="color:#fff;">BODU Relational HMI Program</strong> is a comprehensive, cloud-connected academic management platform built for <strong style="color:#fff;">Beyond Our Dreams University, Bishoftu Campus</strong>. It covers the complete student lifecycle — from intake registration and fee collection through grade management, GPA reporting, and multi-office administration.</p>
                             <ul style="color:#ccc; margin:0; padding-left:18px;">
                                 <li>Backed by <strong style="color:#fff;">Firebase Firestore</strong> for real-time cloud sync across all staff sessions simultaneously.</li>
                                 <li>All financial figures are in <strong style="color:#fff;">ETB (Ethiopian Birr)</strong>.</li>
-                                <li>Interface available in <strong style="color:#fff;">English, Afaan Oromoo, and Amharic</strong>.</li>
+                                <li>Supports <strong style="color:#fff;">multilingual use via Google Translate</strong> — click the <strong style="color:#fff;">Select Language</strong> button to translate the interface into any language including Afaan Oromoo, Amharic, Arabic, and more.</li>
                                 <li>Entire platform runs from a <strong style="color:#fff;">single HTML file</strong> — no installation or server setup required.</li>
                             </ul>
                         </div>
 
                         <!-- 2. Role-Based Access -->
                         <div style="background:#252525; border-left:4px solid #00a2ff; border-radius:6px; padding:14px 16px;">
-                            <div style="color:#00a2ff; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">👥 2. Role-Based Access — Who Uses This System</div>
+                            <div style="color:#00a2ff; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">👥 2. Role-Based Access — Who Uses This Program</div>
                             <ul style="color:#ccc; margin:0; padding-left:18px;">
-                                <li><strong style="color:#ff6666;">🔴 Admin (08)</strong> — Full system control: all data, passwords, grade scale, fee config, audit log.</li>
+                                <li><strong style="color:#ff6666;">🔴 Admin (08)</strong> — Full program control: all data, passwords, grade scale, fee config, audit log.</li>
                                 <li><strong style="color:#ce93d8;">🟣 Registrar (05)</strong> — Dept permissions, grade upload control, attendance, audit log, dept messaging.</li>
                                 <li><strong style="color:#4caf50;">🟢 Cashier (03)</strong> — Process pending payment requests, collect tuition, auto-fill fee amounts.</li>
                                 <li><strong style="color:#ffd700;">🟡 Finance Head (04)</strong> — Set fee structures per level/dept, view full payment ledger, send fee messages.</li>
@@ -4837,9 +4479,8 @@
                         <div style="background:#252525; border-left:4px solid #4caf50; border-radius:6px; padding:14px 16px;">
                             <div style="color:#4caf50; font-weight:bold; font-size:0.9rem; margin-bottom:8px;">📦 3. Core Modules</div>
                             <ul style="color:#ccc; margin:0; padding-left:18px;">
-                                <li><strong style="color:#fff;">🎓 General System:</strong> Course List, Grade Table, Student List, Credits, Student Grade Portal.</li>
+                                <li><strong style="color:#fff;">🎓 All Program:</strong> Course List, Grade Table, Student List, Credits, Student Grade Portal.</li>
                                 <li><strong style="color:#fff;">🗄️ Database Viewer:</strong> Inspect all live data tables; export full database as JSON backup.</li>
-                                <li><strong style="color:#fff;">🖥️ MS Office Suite:</strong> Built-in spreadsheet editor with Excel (.xlsx) export via SheetJS.</li>
                                 <li><strong style="color:#fff;">📋 Registration:</strong> New student intake form, re-registration for continuing students, level-separated DB (Diploma / Degree / Masters / PhD).</li>
                                 <li><strong style="color:#fff;">📝 Registrar's Office:</strong> Dept permission matrix, grade upload control, attendance management, audit log, dept messaging, password management.</li>
                                 <li><strong style="color:#fff;">💰 Finance:</strong> Fee structure config, payment ledger, cashier approval queue, student payment portal.</li>
@@ -4854,7 +4495,7 @@
                                 <li><strong style="color:#fff;">Firebase Firestore:</strong> Real-time <code style="background:#1a1a1a; padding:1px 5px; border-radius:3px;">onSnapshot</code> listeners keep all sessions live — no page refresh needed.</li>
                                 <li><strong style="color:#fff;">SHA-256 Password Security:</strong> All role passwords hashed before cloud storage — never stored in plain text.</li>
                                 <li><strong style="color:#fff;">Credit-Hour Weighted GPA:</strong> GPA = Σ(Grade Point × Credit Hours) ÷ Σ(Credit Hours).</li>
-                                <li><strong style="color:#fff;">Configurable Grade Scale:</strong> Admin adjusts score thresholds for A+, A, B+, B, C+, C, D — applies instantly system-wide.</li>
+                                <li><strong style="color:#fff;">Configurable Grade Scale:</strong> Admin adjusts score thresholds for A+, A, B+, B, C+, C, D — applies instantly program-wide.</li>
                                 <li><strong style="color:#fff;">Audit Log:</strong> Every login, data change, and payment approval is time-stamped and permanently recorded.</li>
                                 <li><strong style="color:#fff;">Excel / CSV Import &amp; Export:</strong> Upload student lists, grade and score data; export any table to .xlsx.</li>
                                 <li><strong style="color:#fff;">Printable GPA Report:</strong> Official A4 layout with registrar signature, date stamp, and verification code.</li>
@@ -4895,7 +4536,7 @@
                                 Developed by <strong style="color:#ccc;">Ayana Dufera</strong> &nbsp;|&nbsp;
                                 Version <strong style="color:#ffd700;"><span class="sysver">v75.0</span></strong> &nbsp;|&nbsp;
                                 © 2026 BODU Bishoftu Campus &nbsp;|&nbsp; All rights reserved.<br>
-                                <span style="font-size:0.72rem; color:#555;">Firebase: <code>rvu-hmi-system</code> &nbsp;|&nbsp; Built with HTML5, CSS3, Vanilla JS, Firebase Firestore, SheetJS</span>
+                                <span style="font-size:0.72rem; color:#555;">Firebase: <code>rvu-hmi-system</code> &nbsp;|&nbsp; Built with HTML5, CSS3, Vanilla JS, Firebase Firestore</span>
                             </p>
                         </div>
 
@@ -4922,31 +4563,72 @@
             return { letter: "F", point: 0 };
         }
 
+        /* ── t() translation helper (portal UI strings) ── */
+        if (typeof t === 'undefined') {
+            window._portalStrings = {
+                'portal-year-opt': 'Select Year',
+                'portal-sem-opt':  'Select Semester',
+                'no-data-msg':     '⚠ No data uploaded. To upload data please click setting button.',
+                'waiting-data':    '[Waiting for Data Upload]',
+                'th-sn':    'S/N',
+                'th-subj':  'Subject',
+                'th-grade': 'Grade',
+                'th-crhrs': 'Cr.Hrs'
+            };
+            window.t = function(key) {
+                return window._portalStrings[key] || key;
+            };
+        }
+
         function toYear() {
             let id = document.getElementById('stuID').value.trim();
-            // Validate against gradeData: check if any entry has this student id
-            const found = Object.values(gradeData).some(rows => rows.some(r => r["student id"] === id));
-            if (!found) { alert("ID NOT FOUND!"); return; }
+            if (!id) { alert("Please enter your Student ID."); return; }
+
+            // Case-insensitive ID match helper
+            const idMatch = (r) => {
+                const rid = (r["student id"] || r["Student ID"] || r["studentId"] || r["studentid"] || r["id"] || '').toString().trim();
+                return rid.toLowerCase() === id.toLowerCase();
+            };
+
+            // Validate ID exists in gradeData or studentListData
+            const foundInGrades = Object.values(gradeData).some(rows => Array.isArray(rows) && rows.some(idMatch));
+            const foundInStudentList = Array.isArray(studentListData) && studentListData.some(idMatch);
+
+            if (!foundInGrades && !foundInStudentList) {
+                const dataIsLoading = Object.keys(gradeData).length === 0 && (!Array.isArray(studentListData) || studentListData.length === 0);
+                if (dataIsLoading) {
+                    alert("⏳ Data is still loading from the server.\n\nPlease wait a few seconds and try again.");
+                } else {
+                    alert("❌ ID NOT FOUND!\n\nStudent ID \"" + id + "\" was not found.\n\nPlease check your ID and try again, or contact the Registrar.");
+                }
+                return;
+            }
+
+            // Always show all Year 1–5 options
+            const stuYearSel = document.getElementById('stuYear');
+            stuYearSel.innerHTML = `<option value="" disabled selected>${t('portal-year-opt') || 'Select Year'}</option>`;
+            ["Year 1","Year 2","Year 3","Year 4","Year 5"].forEach(yr => {
+                const opt = document.createElement('option');
+                opt.value = yr;
+                opt.textContent = yr;
+                stuYearSel.appendChild(opt);
+            });
             goBack('yearSection');
         }
 
         function toSemester() {
-            const id = document.getElementById('stuID').value.trim();
             const year = document.getElementById('stuYear').value;
+            if (!year) { alert("Please select a year first."); return; }
+
+            // Always show all Sem I – Sem III options
             const semSelect = document.getElementById('stuSem');
-            semSelect.innerHTML = `<option value="" disabled selected>${t('portal-sem-opt')}</option>`;
-            // Populate only semesters present in gradeData for this year that contain this student
-            semesters.forEach(sem => {
-                const key = `${year}-${sem}`;
-                const rows = gradeData[key];
-                if (rows && rows.some(r => r["student id"] === id)) {
-                    const opt = document.createElement('option');
-                    opt.value = sem;
-                    opt.textContent = sem;
-                    semSelect.appendChild(opt);
-                }
+            semSelect.innerHTML = `<option value="" disabled selected>${t('portal-sem-opt') || 'Select Semester'}</option>`;
+            ["Sem I","Sem II","Sem III"].forEach(sem => {
+                const opt = document.createElement('option');
+                opt.value = sem;
+                opt.textContent = sem;
+                semSelect.appendChild(opt);
             });
-            if (semSelect.options.length === 1) { alert("No data found for this student in the selected year."); return; }
             goBack('semSection');
         }
 
@@ -5068,8 +4750,15 @@
 
             const key = `${yearStr}-${sem}`;
             const rows = gradeData[key];
-            const studentRow = rows && rows.find(r => r["student id"] === id);
-            if (!studentRow) { alert("No data found."); return; }
+            // Case-insensitive ID match
+            const studentRow = rows && rows.find(r => {
+                const rid = (r["student id"] || r["Student ID"] || r["studentId"] || r["studentid"] || '').toString().trim();
+                return rid.toLowerCase() === id.toLowerCase();
+            });
+            if (!studentRow) {
+                alert("⚠️ No grade data found for ID: " + id + "\nin " + yearStr + " — " + sem + ".\n\nPlease select a different year or semester, or contact the Registrar.");
+                return;
+            }
 
             const studentMeta = studentListData.find(s => s["student id"] === id);
             const studentName = studentMeta ? studentMeta["full name"] : id;
@@ -5085,7 +4774,8 @@
                 currentGrades.push({ title: col, letter, point, chrs });
             });
 
-            let acadYearFormat = yearStr === "Year 1" ? "2023(1)" : (yearStr === "Year 2" ? "2024(2)" : "2025(3)");
+            const _yearMap = {"Year 1":"2023(1)","Year 2":"2024(2)","Year 3":"2025(3)","Year 4":"2026(4)","Year 5":"2027(5)"};
+            let acadYearFormat = _yearMap[yearStr] || yearStr;
             document.getElementById('resDept').innerText = "Dept of " + studentDept;
             const clsInfo = [portalSelectedClass, portalSelectedLevel].filter(Boolean).join(' — ');
             document.getElementById('resInfo').innerHTML =
@@ -5264,41 +4954,6 @@
         function openSettings() {
             document.getElementById('settingsOverlay').style.display = 'block';
         }
-        function closePwModal() {
-            document.getElementById('passwordOverlay').style.display = 'none';
-        }
-        async function checkPassword() {
-            const entered = document.getElementById('settingsPassword').value;
-            const hash = await sha256(entered);
-            if (hash === window.ADMIN_PASSWORD) {
-                document.getElementById('passwordOverlay').style.display = 'none';
-                document.getElementById('settingsOverlay').style.display = 'block';
-                document.getElementById('pwError').textContent = '';
-            } else {
-                document.getElementById('pwError').textContent = '❌ Incorrect password. Try again.';
-                document.getElementById('settingsPassword').value = '';
-            }
-        }
-        async function changePassword() {
-            const old = document.getElementById('oldPassword0').value.trim();
-            const p1  = document.getElementById('newPassword1').value.trim();
-            const p2  = document.getElementById('newPassword2').value.trim();
-            const msg = document.getElementById('pwChangeMsg');
-            if (!old) { msg.style.color='#cc0000'; msg.textContent='❌ Enter your current password.'; return; }
-            const oldHash = await sha256(old);
-            if (oldHash !== window.ADMIN_PASSWORD) { msg.style.color='#cc0000'; msg.textContent='❌ Current password is incorrect.'; return; }
-            if (!p1) { msg.style.color='#cc0000'; msg.textContent='❌ Password cannot be empty.'; return; }
-            if (p1.length < 6) { msg.style.color='#cc0000'; msg.textContent='❌ Password must be at least 6 characters.'; return; }
-            if (p1 !== p2) { msg.style.color='#cc0000'; msg.textContent='❌ Passwords do not match.'; return; }
-            window.ADMIN_PASSWORD = await sha256(p1);
-            fbSavePasswords(); /* auto-save hashed password to cloud */
-            auditLog('Password Changed', 'Admin password was updated');
-            msg.style.color = '#4caf50';
-            msg.textContent = '✅ Password updated successfully!';
-            document.getElementById('oldPassword0').value = '';
-            document.getElementById('newPassword1').value = '';
-            document.getElementById('newPassword2').value = '';
-        }
         function closeSettings() {
             document.getElementById('settingsOverlay').style.display = 'none';
         }
@@ -5329,28 +4984,8 @@
             }
         }
 
-        function showSettingsTab(tabId) {
-            document.querySelectorAll('.settings-tab').forEach(t => t.style.display = 'none');
-            document.getElementById(tabId).style.display = 'block';
-            const map = { 'tab-students': 'stab-students', 'tab-grades': 'stab-grades', 'tab-scores': 'stab-scores', 'tab-credits': 'stab-credits' };
-            const colors = {
-                'stab-students': ['#2e7d32', '#4caf50', 'white'],
-                'stab-grades':   ['#005a9e', '#00a2ff', 'white'],
-                'stab-scores':   ['#4a148c', '#ce93d8', 'white'],
-                'stab-credits':  ['#5c3d00', '#ffae00', 'white']
-            };
-            Object.values(map).forEach(id => {
-                const c = colors[id];
-                document.getElementById(id).style.background = '#1a1a1a';
-                document.getElementById(id).style.color = '#aaa';
-                document.getElementById(id).style.borderColor = '#333';
-            });
-            const activeId = map[tabId];
-            const c = colors[activeId];
-            document.getElementById(activeId).style.background = c[0];
-            document.getElementById(activeId).style.borderColor = c[1];
-            document.getElementById(activeId).style.color = c[2];
-        }
+
+
 
         /* ── Action password gate ── */
         let _pendingAction = null; // { type, mergeMode } or { type, action:'choose' }
@@ -5545,7 +5180,7 @@
                 <span style="font-size:2rem;">⚖️</span>
                 <div>
                     <h2 style="color:#ffd700; margin:0; font-size:1.2rem; letter-spacing:1px;">TERMS OF USE &amp; USER RULES</h2>
-                    <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">BODU Relational HMI System — <span class="sysver">v75.0</span></p>
+                    <p style="color:#888; font-size:0.75rem; margin:2px 0 0;">BODU Relational HMI Program — <span class="sysver">v75.0</span></p>
                 </div>
                 <button onclick="closeLawModal()" style="position:absolute; top:16px; right:16px; background:#cc0000; color:white; border:none; padding:7px 16px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">✕ CLOSE</button>
             </div>
@@ -5558,7 +5193,7 @@
                 <div style="background:#252525; border-left:4px solid #ffd700; border-radius:6px; padding:14px 16px;">
                     <div style="color:#ffd700; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">📋 1. Authorised Use &amp; Role Access</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>This system is exclusively for <strong style="color:#fff;">registered students and authorised staff</strong> of Beyond Our Dreams University, Bishoftu Campus.</li>
+                        <li>This program is exclusively for <strong style="color:#fff;">registered students and authorised staff</strong> of Beyond Our Dreams University, Bishoftu Campus.</li>
                         <li>Access is role-gated by password: <strong style="color:#fff;">Admin, Registrar, Cashier, Finance Head, Dept Head, Teacher, Student (Student ID), Server Access.</strong> Using another person's credentials or attempting to access a role above your own is strictly prohibited.</li>
                         <li>All role passwords are stored as <strong style="color:#fff;">SHA-256 hashes</strong> in Firebase. Plain-text passwords are automatically migrated on first load. Never share your password verbally or in writing.</li>
                         <li>Unauthorised access may be subject to disciplinary or legal action under applicable Ethiopian law. Every login action is recorded in the <strong style="color:#fff;">Audit Log</strong>.</li>
@@ -5569,7 +5204,7 @@
                 <div style="background:#252525; border-left:4px solid #00a2ff; border-radius:6px; padding:14px 16px;">
                     <div style="color:#00a2ff; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🔐 2. Role Responsibilities</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li><strong style="color:#fff;">Admin:</strong> Full system control — grade scale configuration, fee structure management, course credits, student data upload, all passwords, audit log access, database JSON export/backup, and academic calendar settings (years, semesters, curriculum).</li>
+                        <li><strong style="color:#fff;">Admin:</strong> Full program control — grade scale configuration, fee structure management, course credits, student data upload, all passwords, audit log access, database JSON export/backup, and academic calendar settings (years, semesters, curriculum).</li>
                         <li><strong style="color:#fff;">Registrar:</strong> Manages department-level grade upload permissions and deadlines, attendance password, student registration permissions (new intake &amp; re-registration), new/old student registration deadlines, and commits Dept Head-approved grades to the live database. Also manages messages and the permission matrix.</li>
                         <li><strong style="color:#fff;">Finance Head:</strong> Reviews all payment ledger records, fee type configurations, and financial reports. No fee amount may be altered after a payment is approved.</li>
                         <li><strong style="color:#fff;">Cashier:</strong> Searches students by ID, views fee clearance status, and records individual fee payments. Cannot alter fee type configurations.</li>
@@ -5581,9 +5216,9 @@
 
                 <!-- 3 -->
                 <div style="background:#252525; border-left:4px solid #4caf50; border-radius:6px; padding:14px 16px;">
-                    <div style="color:#4caf50; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🎓 3. General System — Data Viewing Rules</div>
+                    <div style="color:#4caf50; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🎓 3. All Program — Data Viewing Rules</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>The <strong style="color:#fff;">General System</strong> panel provides access to: Score (Course List), Student List, Grade Table, Credits, and the Student Grade Portal. Data is filtered by Academic Year → Semester → Class → Level → Department.</li>
+                        <li>The <strong style="color:#fff;">All Program</strong> panel provides access to: Score (Course List), Student List, Grade Table, Credits, and the Student Grade Portal. Data is filtered by Academic Year → Semester → Class → Level → Department.</li>
                         <li>The <strong style="color:#fff;">Score</strong> tab displays uploaded course score data per class, level, and department. Only Admin can view all data without a role filter.</li>
                         <li>The <strong style="color:#fff;">Student List</strong> tab shows registered students. Admin can add course credits and edit academic configuration. Dept Head and Teacher views are filtered to their department.</li>
                         <li>The <strong style="color:#fff;">Grade</strong> tab shows committed grade data. Admin can view and print full tables. Dept Head and Teacher views are scoped to their department.</li>
@@ -5596,9 +5231,9 @@
                 <div style="background:#252525; border-left:4px solid #ce93d8; border-radius:6px; padding:14px 16px;">
                     <div style="color:#ce93d8; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🏛️ 4. Registration Rules</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>New student registration is only open when the Registrar has enabled it and the registration deadline has not passed. The system enforces this automatically.</li>
+                        <li>New student registration is only open when the Registrar has enabled it and the registration deadline has not passed. The program enforces this automatically.</li>
                         <li>Old student re-registration requires payment clearance. Students blocked by the Cashier cannot complete re-registration until their fees are settled.</li>
-                        <li>Each student may register only <strong style="color:#fff;">once per semester</strong>. Duplicate registrations within the same semester are rejected by the system.</li>
+                        <li>Each student may register only <strong style="color:#fff;">once per semester</strong>. Duplicate registrations within the same semester are rejected by the program.</li>
                         <li>Re-registration eligibility criteria (minimum GPA, maximum failed subjects, and class assignment) are configured by the Registrar and enforced automatically.</li>
                         <li>Students must not attempt to alter their own registration records. All self-editing is blocked — modifications must go through the Registrar's office.</li>
                         <li>The <strong style="color:#fff;">Database tab</strong> (Admin/Registrar only) provides an SQL-style viewer of all Firebase collections. No data may be exported, shared, or published beyond authorised technical personnel.</li>
@@ -5613,7 +5248,7 @@
                         <li>Teachers must complete both Score File (A) and Grade File (B) in a single submission cycle. Partial uploads are not forwarded to the Dept Head for review.</li>
                         <li>Dept Heads must review and approve or reject teacher submissions within the open window. Delayed approvals causing grade unavailability are the Dept Head's responsibility.</li>
                         <li>The <strong style="color:#fff;">Exam Center</strong> is password-protected. The Dept Head manages the Exam Bank (question sets per course), opens/closes live exam sessions, and sets the minimum attendance threshold required for a student to sit an exam.</li>
-                        <li>Students who do not meet the attendance threshold for a course are blocked from accessing that exam — this is enforced automatically by the system.</li>
+                        <li>Students who do not meet the attendance threshold for a course are blocked from accessing that exam — this is enforced automatically by the program.</li>
                         <li>Exam results published through the Exam Center are visible to students via the <strong style="color:#fff;">Exam Results portal</strong>. The Dept Head controls whether results are open or closed for student viewing.</li>
                         <li>Uploading falsified, manipulated, or altered Score, Grade, or Exam files is a serious academic integrity violation and will be recorded in the Audit Log.</li>
                     </ul>
@@ -5623,11 +5258,11 @@
                 <div style="background:#252525; border-left:4px solid #26c6da; border-radius:6px; padding:14px 16px;">
                     <div style="color:#26c6da; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🖨️ 6. Printed Documents, Verification &amp; Audit</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>All printed outputs (GPA reports, grade tables, attendance sheets, score lists) generated by this system carry the BODU seal, a date/time stamp, and a unique <strong style="color:#fff;">verification code</strong>. Altering or removing any of these elements is a forgery offence.</li>
+                        <li>All printed outputs (GPA reports, grade tables, attendance sheets, score lists) generated by this program carry the BODU seal, a date/time stamp, and a unique <strong style="color:#fff;">verification code</strong>. Altering or removing any of these elements is a forgery offence.</li>
                         <li>Verification codes on GPA printouts can be authenticated at the Registrar's Office. Printed reports are for personal reference only until physically stamped and signed by the Registrar.</li>
-                        <li>No system output may be reproduced or submitted as an official document without the Registrar's written authorisation.</li>
-                        <li>Every significant action in the system (logins, uploads, approvals, rejections, data changes, exports) is recorded in the <strong style="color:#fff;">Audit Log</strong>. The Audit Log is read-only for all roles including Admin — it cannot be deleted or altered.</li>
-                        <li>The database JSON export/backup feature (Admin only) must not be distributed beyond authorised technical personnel. The export filename includes the system version for traceability.</li>
+                        <li>No program output may be reproduced or submitted as an official document without the Registrar's written authorisation.</li>
+                        <li>Every significant action in the program (logins, uploads, approvals, rejections, data changes, exports) is recorded in the <strong style="color:#fff;">Audit Log</strong>. The Audit Log is read-only for all roles including Admin — it cannot be deleted or altered.</li>
+                        <li>The database JSON export/backup feature (Admin only) must not be distributed beyond authorised technical personnel. The export filename includes the program version for traceability.</li>
                     </ul>
                 </div>
 
@@ -5635,7 +5270,7 @@
                 <div style="background:#252525; border-left:4px solid #e57373; border-radius:6px; padding:14px 16px;">
                     <div style="color:#e57373; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">🚫 7. Prohibited Actions</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>Do <strong style="color:#e57373;">not</strong> attempt to reverse-engineer, decompile, modify, or tamper with the system's HTML, JavaScript, or Firebase security rules.</li>
+                        <li>Do <strong style="color:#e57373;">not</strong> attempt to reverse-engineer, decompile, modify, or tamper with the program's HTML, JavaScript, or Firebase security rules.</li>
                         <li>Do <strong style="color:#e57373;">not</strong> upload falsified, altered, or manipulated Score, Grade, Student List, or Exam files.</li>
                         <li>Do <strong style="color:#e57373;">not</strong> share, photograph, screenshot, publish, or distribute another student's academic, financial, or personal records.</li>
                         <li>Do <strong style="color:#e57373;">not</strong> use the Database viewer, JSON export, or any admin tool for any purpose outside authorised academic administration.</li>
@@ -5649,12 +5284,12 @@
                 <div style="background:#252525; border-left:4px solid #ef9a9a; border-radius:6px; padding:14px 16px;">
                     <div style="color:#ef9a9a; font-weight:bold; font-size:0.9rem; margin-bottom:6px;">⚠️ 8. Disclaimer &amp; Liability</div>
                     <ul style="color:#ccc; margin:0; padding-left:18px;">
-                        <li>This system runs entirely in the browser and syncs data live with <strong style="color:#fff;">Firebase Firestore</strong>. A stable internet connection is required for all data operations — uploads, saves, and real-time sync.</li>
-                        <li>BODU and the system developer accept no liability for data loss resulting from browser clearing, device failure, or network interruption during an active upload or save session.</li>
-                        <li>Data displayed in this system is for informational purposes. Always verify critical academic, financial, or registration decisions with the Registrar's Office directly.</li>
+                        <li>This program runs entirely in the browser and syncs data live with <strong style="color:#fff;">Firebase Firestore</strong>. A stable internet connection is required for all data operations — uploads, saves, and real-time sync.</li>
+                        <li>BODU and the program developer accept no liability for data loss resulting from browser clearing, device failure, or network interruption during an active upload or save session.</li>
+                        <li>Data displayed in this program is for informational purposes. Always verify critical academic, financial, or registration decisions with the Registrar's Office directly.</li>
                         <li>For grade disputes or correction requests, contact your department instructor or the Registrar's Office — do not attempt to alter records yourself.</li>
-                        <li>System availability is subject to Firebase service uptime. Planned maintenance windows will be communicated by the Registrar's Office in advance.</li>
-                        <li>The Google Translate feature is provided for accessibility only. The English content is the authoritative version of all system text, rules, and instructions.</li>
+                        <li>Program availability is subject to Firebase service uptime. Planned maintenance windows will be communicated by the Registrar's Office in advance.</li>
+                        <li>The Google Translate feature is provided for accessibility only. The English content is the authoritative version of all program text, rules, and instructions.</li>
                     </ul>
                 </div>
 
@@ -5662,8 +5297,8 @@
 
             <!-- Footer -->
             <div style="margin-top:22px; text-align:center; color:#666; font-size:0.72rem; border-top:1px solid #333; padding-top:14px;">
-                By using this system you acknowledge that you have read, understood, and agreed to all rules above.<br>
-                <strong style="color:#888;">© 2026 BODU Relational HMI System v75.0 — Developed by Ayana Dufera — All rights reserved.</strong>
+                By using this program you acknowledge that you have read, understood, and agreed to all rules above.<br>
+                <strong style="color:#888;">© 2026 BODU Relational HMI Program v75.0 — Developed by Ayana Dufera — All rights reserved.</strong>
             </div>
 
         </div>
@@ -5888,94 +5523,7 @@
     <!-- ════════════════════════════════════
          02 — EXCEL TABLE BUILDER (Admin)
     ════════════════════════════════════ -->
-    <div id="excelOverlay" class="feat-overlay">
-        <div class="feat-panel" style="border-color:#4caf50; max-width:820px;">
-            <button class="feat-close" onclick="document.getElementById('excelOverlay').style.display='none'">✕ CLOSE</button>
-            <h2 style="color:#4caf50;">🖥️ Ms Office Suite</h2>
 
-            <!-- Admin gate -->
-            <div id="excelGate" style="">
-                <p style="color:#aaa; font-size:0.85rem; margin-bottom:10px;">Enter admin password to use the Office Suite.</p>
-                <input type="password" id="excelPwInput" placeholder="Admin password"
-                    style="width:100%;max-width:320px; padding:10px; border-radius:8px; border:2px solid #4caf50; background:#111; color:#fff; font-size:1rem; box-sizing:border-box; outline:none;"
-                    onkeydown="if(event.key==='Enter') excelUnlock()">
-                <div id="excelPwError" style="color:#cc0000;font-size:0.8rem;margin-top:6px;min-height:16px;"></div>
-                <br><button class="btn-feat btn-feat-green" style="margin-top:10px;" onclick="excelUnlock()">🔓 Unlock</button>
-            </div>
-
-            <div id="excelContent" style="display:none;">
-                <!-- Office app tabs -->
-                <div style="display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;">
-                    <button id="offTab-excel" onclick="offShowTab('excel')" class="btn-feat btn-feat-green" style="font-size:0.78rem; padding:7px 14px;">📊 Excel Spreadsheet</button>
-                    <button id="offTab-word"  onclick="offShowTab('word')"  class="btn-feat" style="font-size:0.78rem; padding:7px 14px; border-color:#2196f3; background:#0d2a4a;">📝 Word Document (.docx)</button>
-                    <button id="offTab-pptx"  onclick="offShowTab('pptx')"  class="btn-feat" style="font-size:0.78rem; padding:7px 14px; border-color:#ff6633; background:#3a1200;">📽️ Presentation (.pptx)</button>
-                </div>
-
-                <!-- EXCEL TAB -->
-                <div id="offPanel-excel">
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
-                        <label style="color:#aaa; font-size:0.82rem;">Cols:</label>
-                        <input type="number" id="xlCols" value="5" min="1" max="20" style="width:60px; padding:6px; border-radius:6px; border:1px solid #444; background:#111; color:#fff; font-size:0.9rem; outline:none;">
-                        <label style="color:#aaa; font-size:0.82rem;">Rows:</label>
-                        <input type="number" id="xlRows" value="7" min="1" max="100" style="width:60px; padding:6px; border-radius:6px; border:1px solid #444; background:#111; color:#fff; font-size:0.9rem; outline:none;">
-                        <button class="btn-feat btn-feat-green" onclick="xlBuild()">🔨 Build Table</button>
-                        <button class="btn-feat" onclick="xlAddRow()">+ Row</button>
-                        <button class="btn-feat" onclick="xlAddCol()">+ Col</button>
-                        <button class="btn-feat btn-feat-amber" onclick="xlDownload()">⬇ Download .xlsx</button>
-                        <button class="btn-feat" style="border-color:#ce93d8;background:#4a148c;" onclick="xlImport()">⬆ Import .xlsx/.csv</button>
-                        <input type="file" id="xlImportFile" accept=".xlsx,.xls,.csv" style="display:none;" onchange="xlHandleImport(this)">
-                    </div>
-                    <div id="xlTableWrap" style="overflow:auto; max-height:460px; border:1px solid #333; border-radius:8px;"></div>
-                </div>
-
-                <!-- WORD TAB -->
-                <div id="offPanel-word" style="display:none;">
-                    <p style="color:#aaa; font-size:0.8rem; margin-bottom:12px;">Create a Word document (.docx). Add title, headings, and body text, then download.</p>
-                    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px;">
-                        <input type="text" id="wordTitle" placeholder="Document Title"
-                            style="width:100%; padding:9px; border-radius:6px; border:2px solid #2196f3; background:#111; color:#fff; font-size:1rem; box-sizing:border-box; outline:none; font-weight:bold;">
-                        <input type="text" id="wordAuthor" placeholder="Author name (optional)"
-                            style="width:100%; padding:8px; border-radius:6px; border:1px solid #444; background:#111; color:#aaa; font-size:0.88rem; box-sizing:border-box; outline:none;">
-                        <textarea id="wordBody" placeholder="Type your document content here. Use new lines to separate paragraphs. Start a line with ## for a heading, e.g:
-## Introduction
-This is the first paragraph..."
-                            style="width:100%; height:280px; padding:10px; border-radius:6px; border:1px solid #444; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none; resize:vertical; font-family:'Segoe UI',sans-serif; line-height:1.6;"></textarea>
-                    </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <button class="btn-feat" style="border-color:#2196f3; background:#0d2a4a; flex:1;" onclick="wordPreview()">👁 Preview</button>
-                        <button class="btn-feat btn-feat-amber" style="flex:1;" onclick="wordDownload()">⬇ Download .docx</button>
-                    </div>
-                    <div id="wordPreviewArea" style="display:none; margin-top:14px; background:#fff; color:#111; border-radius:8px; padding:24px 28px; font-family:'Times New Roman',serif; font-size:13px; line-height:1.8; max-height:400px; overflow-y:auto;"></div>
-                    <div id="wordMsg" style="min-height:16px; font-size:0.8rem; margin-top:8px;"></div>
-                </div>
-
-                <!-- PRESENTATION TAB -->
-                <div id="offPanel-pptx" style="display:none;">
-                    <p style="color:#aaa; font-size:0.8rem; margin-bottom:12px;">Build a presentation. Add slides with title and content, then download as HTML presentation or export slide list.</p>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:flex-end;">
-                        <div style="flex:1; min-width:180px;">
-                            <label style="color:#aaa; font-size:0.76rem; display:block; margin-bottom:3px;">Slide Title</label>
-                            <input type="text" id="pptSlideTitle" placeholder="Slide title"
-                                style="width:100%; padding:8px; border-radius:6px; border:1.5px solid #ff6633; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none;">
-                        </div>
-                        <div style="flex:2; min-width:220px;">
-                            <label style="color:#aaa; font-size:0.76rem; display:block; margin-bottom:3px;">Slide Content</label>
-                            <input type="text" id="pptSlideBody" placeholder="Content / bullet points (separate with |)"
-                                style="width:100%; padding:8px; border-radius:6px; border:1.5px solid #ff6633; background:#111; color:#fff; font-size:0.9rem; box-sizing:border-box; outline:none;">
-                        </div>
-                        <button class="btn-feat" style="border-color:#ff6633; background:#3a1200; flex:none;" onclick="pptAddSlide()">➕ Add Slide</button>
-                    </div>
-                    <div id="pptSlideList" style="min-height:60px; margin-bottom:14px;"></div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <button class="btn-feat" style="border-color:#ff6633; background:#3a1200; flex:1;" onclick="pptPreview()">👁 Preview Slideshow</button>
-                        <button class="btn-feat btn-feat-amber" style="flex:1;" onclick="pptDownload()">⬇ Download HTML Presentation</button>
-                        <button class="btn-feat" style="border-color:#cc0000; background:#3a0000; flex:none;" onclick="pptClear()">🗑 Clear All</button>
-                    </div>
-                    <div id="pptMsg" style="min-height:16px; font-size:0.8rem; margin-top:8px;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- ════════════════════════════════════
          03 — REGISTRATION PERMISSION (Admin) — v15 Matrix Ticker
@@ -6442,7 +5990,7 @@ This is the first paragraph..."
                         <!-- Academic Year and Semester -->
                         <div style="color:#00a2ff; font-size:0.75rem; font-weight:bold; margin-top:4px; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px;">New Academic Term</div>
                         <div style="background:#0a0a1a; border:1px solid #1a1a5e; border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.78rem; color:#aaa; line-height:1.5;">
-                            ⚠️ Your current recorded term is: <strong id="oldReg_currentTerm" style="color:#ffd700;"></strong>. You must register for the <strong style="color:#4caf50;">next semester only</strong>. The system will verify this automatically.
+                            ⚠️ Your current recorded term is: <strong id="oldReg_currentTerm" style="color:#ffd700;"></strong>. You must register for the <strong style="color:#4caf50;">next semester only</strong>. The program will verify this automatically.
                         </div>
                         <div style="display:flex; gap:10px;">
                             <div style="flex:1;">
@@ -7913,273 +7461,7 @@ This is the first paragraph..."
         /* ══════════════════════════════════════
            02 — EXCEL BUILDER
         ══════════════════════════════════════ */
-        let xlData = []; /* array of arrays */
 
-        /* ── OFFICE SUITE TAB SWITCHER ── */
-
-        /* Open Ms Office overlay directly on a specific tab */
-        function excelUnlock_direct(tab) {
-            const overlay = document.getElementById('excelOverlay');
-            const content = document.getElementById('excelContent');
-            overlay.style.display = 'block';
-            window._pendingOffTab = tab;
-            /* If already unlocked, go straight to tab */
-            if (content && content.style.display !== 'none') {
-                offShowTab(tab);
-                if (tab === 'excel') xlBuild();
-                window._pendingOffTab = null;
-            }
-        }
-        /* Patch excelUnlock to respect _pendingOffTab */
-        window.excelUnlock = async function() {
-            const pw = document.getElementById('excelPwInput').value;
-            const hash = await sha256(pw);
-            if (hash !== window.ADMIN_PASSWORD) {
-                document.getElementById('excelPwError').textContent = '❌ Incorrect password.';
-                document.getElementById('excelPwInput').value = ''; return;
-            }
-            document.getElementById('excelGate').style.display = 'none';
-            document.getElementById('excelContent').style.display = '';
-            const tab = window._pendingOffTab || 'excel';
-            window._pendingOffTab = null;
-            offShowTab(tab);
-            if (tab === 'excel') xlBuild();
-        };
-        function offShowTab(tab) {
-            ['excel','word','pptx'].forEach(t => {
-                const p = document.getElementById('offPanel-' + t);
-                const b = document.getElementById('offTab-' + t);
-                if (p) p.style.display = t === tab ? '' : 'none';
-                if (b) b.style.opacity = t === tab ? '1' : '0.55';
-            });
-        }
-
-        /* ── WORD DOCUMENT ── */
-        function wordPreview() {
-            const title  = document.getElementById('wordTitle').value.trim();
-            const body   = document.getElementById('wordBody').value;
-            const area   = document.getElementById('wordPreviewArea');
-            if (!title && !body) { document.getElementById('wordMsg').textContent = '⚠ Please enter a title or content.'; return; }
-            let html = '';
-            if (title) html += `<h1 style="text-align:center; border-bottom:2px solid #333; padding-bottom:8px; margin-bottom:20px;">${title}</h1>`;
-            body.split('\n').forEach(line => {
-                const l = line.trim();
-                if (!l) { html += '<br>'; return; }
-                if (l.startsWith('## '))      html += `<h2 style="color:#111; margin-top:16px;">${l.slice(3)}</h2>`;
-                else if (l.startsWith('# '))  html += `<h1 style="color:#111;">${l.slice(2)}</h1>`;
-                else if (l.startsWith('- '))  html += `<li style="margin-left:20px;">${l.slice(2)}</li>`;
-                else html += `<p style="margin:0 0 8px;">${l}</p>`;
-            });
-            area.innerHTML = html;
-            area.style.display = '';
-            document.getElementById('wordMsg').textContent = '';
-        }
-
-        function wordDownload() {
-            const title  = document.getElementById('wordTitle').value.trim() || 'Document';
-            const author = document.getElementById('wordAuthor').value.trim() || 'Unknown';
-            const body   = document.getElementById('wordBody').value;
-            /* Build RTF — universally opens in Word */
-            let rtf = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}\\f0\\fs24 ';
-            rtf += '{\\b\\fs32 ' + title.replace(/[{}\\]/g,'') + '}\\par\\par ';
-            body.split('\n').forEach(line => {
-                const l = line.trim();
-                if (!l) { rtf += '\\par '; return; }
-                if (l.startsWith('## ')) rtf += '{\\b\\fs28 ' + l.slice(3).replace(/[{}\\]/g,'') + '}\\par ';
-                else rtf += l.replace(/[{}\\]/g,'') + '\\par ';
-            });
-            rtf += '}';
-            const blob = new Blob([rtf], { type: 'application/rtf' });
-            const url  = URL.createObjectURL(blob);
-            const a    = document.createElement('a');
-            a.href = url; a.download = title + '.rtf'; a.click();
-            URL.revokeObjectURL(url);
-            document.getElementById('wordMsg').style.color='#4caf50';
-            document.getElementById('wordMsg').textContent='✅ Downloaded as .rtf (opens in Word)';
-        }
-
-        /* ── PRESENTATION BUILDER ── */
-        let pptSlides = [];
-
-        function pptAddSlide() {
-            const t = document.getElementById('pptSlideTitle').value.trim();
-            const b = document.getElementById('pptSlideBody').value.trim();
-            if (!t) { document.getElementById('pptMsg').textContent='⚠ Slide title required.'; return; }
-            pptSlides.push({ title: t, body: b });
-            document.getElementById('pptSlideTitle').value = '';
-            document.getElementById('pptSlideBody').value = '';
-            document.getElementById('pptMsg').textContent = '';
-            pptRenderList();
-        }
-
-        function pptRenderList() {
-            const list = document.getElementById('pptSlideList');
-            if (!pptSlides.length) { list.innerHTML = '<p style="color:#555; font-size:0.8rem; font-style:italic;">No slides yet — add one above.</p>'; return; }
-            list.innerHTML = pptSlides.map((s, i) => `
-                <div style="display:flex; align-items:center; gap:8px; background:#1a1a1a; border:1px solid #3a1200; border-radius:6px; padding:8px 12px; margin-bottom:6px;">
-                    <span style="color:#ff6633; font-size:0.76rem; font-weight:bold; min-width:26px;">#${i+1}</span>
-                    <span style="color:#fff; font-size:0.82rem; flex:1;">${s.title}</span>
-                    <span style="color:#888; font-size:0.75rem; flex:2; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${s.body}</span>
-                    <button onclick="pptRemoveSlide(${i})" style="background:#cc0000; border:none; color:white; border-radius:4px; padding:3px 8px; font-size:0.72rem; cursor:pointer; flex:none;">✕</button>
-                </div>`).join('');
-        }
-
-        function pptRemoveSlide(i) { pptSlides.splice(i, 1); pptRenderList(); }
-        function pptClear() { pptSlides = []; pptRenderList(); document.getElementById('pptMsg').textContent = ''; }
-
-        function pptPreview() {
-            if (!pptSlides.length) { document.getElementById('pptMsg').textContent='⚠ No slides to preview.'; return; }
-            const html = pptBuildHTML();
-            const win = window.open('', '_blank');
-            if (win) { win.document.write(html); win.document.close(); }
-        }
-
-        function pptDownload() {
-            if (!pptSlides.length) { document.getElementById('pptMsg').textContent='⚠ No slides to download.'; return; }
-            const html = pptBuildHTML();
-            const blob = new Blob([html], { type: 'text/html' });
-            const url  = URL.createObjectURL(blob);
-            const a    = document.createElement('a'); a.href=url; a.download='Presentation.html'; a.click();
-            URL.revokeObjectURL(url);
-            document.getElementById('pptMsg').style.color='#4caf50';
-            document.getElementById('pptMsg').textContent='✅ Presentation downloaded as .html — open in browser for slideshow.';
-        }
-
-        function pptBuildHTML() {
-            const slides = pptSlides.map((s, i) => {
-                const bullets = s.body ? s.body.split('|').map(b => `<li>${b.trim()}</li>`).join('') : '';
-                return `<div class="slide" id="slide${i}" style="display:${i===0?'flex':'none'};">
-                    <h1>${s.title}</h1>
-                    ${bullets ? '<ul>' + bullets + '</ul>' : ''}
-                </div>`;
-            }).join('');
-            return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Presentation</title>
-            <style>
-                body{margin:0;background:#111;font-family:'Segoe UI',sans-serif;overflow:hidden;}
-                .slide{width:100vw;height:100vh;background:linear-gradient(135deg,#1a237e,#0d47a1);
-                    color:white;flex-direction:column;align-items:center;justify-content:center;
-                    padding:60px;box-sizing:border-box;text-align:center;}
-                h1{font-size:3rem;margin-bottom:30px;text-shadow:0 2px 8px rgba(0,0,0,0.5);}
-                ul{font-size:1.6rem;text-align:left;line-height:2.2;}
-                .nav{position:fixed;bottom:20px;right:30px;display:flex;gap:14px;}
-                .nav button{padding:10px 24px;background:rgba(255,255,255,0.2);color:white;
-                    border:2px solid white;border-radius:8px;font-size:1rem;cursor:pointer;}
-                .counter{position:fixed;bottom:24px;left:30px;color:rgba(255,255,255,0.6);font-size:0.9rem;}
-            </style></head><body>
-            ${slides}
-            <div class="nav">
-                <button onclick="navigate(-1)">◀ Prev</button>
-                <button onclick="navigate(1)">Next ▶</button>
-            </div>
-            <div class="counter" id="ctr">1 / ${pptSlides.length}</div>
-            <script>
-                let cur=0, total=${pptSlides.length};
-                function navigate(d){
-                    document.getElementById('slide'+cur).style.display='none';
-                    cur=(cur+d+total)%total;
-                    document.getElementById('slide'+cur).style.display='flex';
-                    document.getElementById('ctr').textContent=(cur+1)+' / '+total;
-                }
-                document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')navigate(1);if(e.key==='ArrowLeft')navigate(-1);});
-            <\/script></body></html>`;
-        }
-
-                function openExcelBuilder() {
-            document.getElementById('excelPwInput').value = '';
-            document.getElementById('excelPwError').textContent = '';
-            document.getElementById('excelGate').style.display = '';
-            document.getElementById('excelContent').style.display = 'none';
-            document.getElementById('excelOverlay').style.display = 'block';
-            setTimeout(() => document.getElementById('excelPwInput').focus(), 80);
-        }
-
-        function xlBuild() {
-            const cols = parseInt(document.getElementById('xlCols').value) || 5;
-            const rows = parseInt(document.getElementById('xlRows').value) || 7;
-            xlData = [];
-            for (let r = 0; r <= rows; r++) {
-                xlData[r] = [];
-                for (let c = 0; c < cols; c++) xlData[r][c] = r === 0 ? `Column ${c+1}` : '';
-            }
-            xlRender();
-        }
-
-        function xlRender() {
-            const wrap = document.getElementById('xlTableWrap');
-            if (!xlData.length) { wrap.innerHTML = ''; return; }
-            const cols = xlData[0].length;
-            let html = '<table style="border-collapse:collapse; min-width:100%;">';
-            xlData.forEach((row, ri) => {
-                const bg = ri === 0 ? '#003366' : '';
-                html += `<tr>`;
-                row.forEach((cell, ci) => {
-                    const style = ri === 0 ? 'background:#003366; color:#00a2ff; padding:5px; border:1px solid #333;' : 'border:1px solid #333; padding:0; background:#1e1e1e;';
-                    html += `<td style="${style}"><input style="background:transparent;border:none;color:${ri===0?'#00a2ff':'#e0e0e0'};padding:5px;width:${ri===0?'100':'100'}%;min-width:80px;font-size:11px;outline:none;box-sizing:border-box;" value="${escHtml(xlData[ri][ci])}" oninput="xlData[${ri}][${ci}]=this.value" onkeydown="xlNavCell(event,${ri},${ci})"></td>`;
-                });
-                html += `</tr>`;
-            });
-            html += '</table>';
-            wrap.innerHTML = html;
-        }
-
-        function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-
-        function xlNavCell(e, ri, ci) {
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                const next = document.querySelector(`#xlTableWrap tr:nth-child(${ri+1}) td:nth-child(${ci+2}) input`);
-                if (next) next.focus();
-            } else if (e.key === 'Enter') {
-                const next = document.querySelector(`#xlTableWrap tr:nth-child(${ri+2}) td:nth-child(${ci+1}) input`);
-                if (next) next.focus();
-            }
-        }
-
-        function xlAddRow() {
-            if (!xlData.length) return;
-            xlData.push(new Array(xlData[0].length).fill(''));
-            document.getElementById('xlRows').value = xlData.length - 1;
-            xlRender();
-        }
-
-        function xlAddCol() {
-            if (!xlData.length) return;
-            xlData.forEach((row, i) => row.push(i === 0 ? `Column ${row.length+1}` : ''));
-            document.getElementById('xlCols').value = xlData[0].length;
-            xlRender();
-        }
-
-        function xlDownload() {
-            if (!xlData.length) { alert('Build a table first.'); return; }
-            const ws = XLSX.utils.aoa_to_sheet(xlData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-            XLSX.writeFile(wb, 'rvu_table_' + Date.now() + '.xlsx');
-        }
-
-        function xlImport() { document.getElementById('xlImportFile').click(); }
-
-        function xlHandleImport(input) {
-            const file = input.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => {
-                try {
-                    if (file.name.endsWith('.csv')) {
-                        const lines = e.target.result.trim().split('\n');
-                        xlData = lines.map(l => l.split(',').map(v => v.trim().replace(/^"|"$/g, '')));
-                    } else {
-                        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-                        const ws = wb.Sheets[wb.SheetNames[0]];
-                        xlData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                    }
-                    document.getElementById('xlCols').value = xlData[0] ? xlData[0].length : 0;
-                    document.getElementById('xlRows').value = xlData.length > 1 ? xlData.length - 1 : 0;
-                    xlRender();
-                } catch(err) { alert('Import error: ' + err.message); }
-            };
-            if (file.name.endsWith('.csv')) reader.readAsText(file); else reader.readAsArrayBuffer(file);
-        }
 
         /* ══════════════════════════════════════
            03 — REGISTRATION PERMISSION (v15 Matrix)
@@ -8641,7 +7923,7 @@ This is the first paragraph..."
 
         function ompPopulateAll(criteria) {
             const sel = criteria || {};
-            /* Pull unique values from live student data; fall back to system lists */
+            /* Pull unique values from live student data; fall back to program lists */
             const liveCls   = getUniqueValues('classification').sort();
             const liveLvls  = getUniqueValues('level').sort();
             const liveDepts = [...new Set([
@@ -8651,7 +7933,7 @@ This is the first paragraph..."
             const liveYears = getUniqueValues('year').sort();
             const liveSems  = getUniqueValues('semester').sort();
 
-            /* Use live data if available, otherwise fall back to system defaults */
+            /* Use live data if available, otherwise fall back to program defaults */
             const clsList   = liveCls.length   ? liveCls   : CLS_LIST;
             const lvlList   = liveLvls.length  ? liveLvls  : LVL_LIST;
             const deptList  = liveDepts.length ? liveDepts : [...new Set(permMatrix.flatMap(r => r.depts||[]))].sort();
@@ -9077,7 +8359,7 @@ This is the first paragraph..."
             };
             req.innerHTML = `<strong style="color:#4caf50;">${level} requirements:</strong><br>
                 <span style="color:#ccc;">${docReqs[level] || 'Upload your education documents in a single PDF.'}</span><br>
-                <span style="color:#ffae00;">⚠ Entrance exam score (12th grade/entrance exam) must be <strong>≥ ${pm}/700</strong> to qualify. The system will automatically verify this from your uploaded file metadata or you will enter the score below.</span>`;
+                <span style="color:#ffae00;">⚠ Entrance exam score (12th grade/entrance exam) must be <strong>≥ ${pm}/700</strong> to qualify. The program will automatically verify this from your uploaded file metadata or you will enter the score below.</span>`;
         }
 
         /* Entrance score input — shown after file chosen */
@@ -15474,7 +14756,7 @@ function _uniParseSemKey(semKey) {
     return { year: m ? m[1] : semKey, sem: m ? m[2] : '' };
 }
 
-/* ── GPA → numeric helper (mirrors existing system logic) ── */
+/* ── GPA → numeric helper (mirrors existing program logic) ── */
 function _uniGpaNum(g) {
     if (g == null || g === '') return null;
     const n = parseFloat(g);
@@ -15604,7 +14886,7 @@ function uniRenderGrades(fYear, fSem) {
             /* ── Course IDs are columns — GRADE row, GPA row, STATUS row + SGPA summary ── */
             const r = rows[0];
 
-            /* Grade-to-point map matching system's letterToPoint */
+            /* Grade-to-point map matching program's letterToPoint */
             const gradeToPoint = {'A+':4.0,'A':4.0,'B+':3.5,'B':3.0,'C+':2.5,'C':2.0,'D':1.0,'F':0,'NG':0,'I':0,'W':0,'DR':0};
 
             /* Per-course values */
@@ -16155,7 +15437,7 @@ function uniSearchPrint(sid, container) {
         @media print { button { display: none; } }
     </style></head><body>
     <h1>🎓 Student Full Report — ID: ${sid}</h1>
-    <p style="color:#555; font-size:10px;">Generated: ${new Date().toLocaleString()} | BODU Relational HMI System</p>
+    <p style="color:#555; font-size:10px;">Generated: ${new Date().toLocaleString()} | BODU Relational HMI Program</p>
     ${container ? container.innerHTML.replace(/style="[^"]*color:#[0-9a-fA-F]{3,6}[^"]*"/g, '') : ''}
     <script>window.onload=()=>{window.print();}<\/script>
     </body></html>`);
@@ -17841,7 +17123,7 @@ async function openStudentExamPortal(studentId, courseId) {
     if (!stu) {
         portalShowError(
             'Student ID Not Found',
-            `No student with ID <strong style="color:#00e5ff;">${studentId}</strong> was found in the system.`,
+            `No student with ID <strong style="color:#00e5ff;">${studentId}</strong> was found in the program.`,
             `<span style="color:#888;font-size:0.73rem;">• Check that you typed your Student ID correctly.<br>• If you are newly registered, contact the Registrar.</span>`
         );
         return;
