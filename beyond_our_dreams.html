@@ -1339,7 +1339,7 @@
         .nav-container { padding: 0; display: flex; flex-direction: column; gap: 0; background: #161616; border-bottom: 2px solid #2a2a2a; width: 100%; box-sizing: border-box; margin-bottom: 0; }
         .nav-row { display: flex; gap: 0; min-height: 0; width: 100%; box-sizing: border-box; flex-wrap: wrap; }
         /* tier-2 = top nav row (GENERAL SYSTEM…) → PILL / STADIUM */
-        #tier-2 button { flex: 0 0 auto !important; flex-grow: 0 !important; white-space: nowrap; font-size: 11px; padding: 10px 14px; border-radius: 20px; clip-path: none; width: auto; min-width: unset; max-width: unset; }
+        #tier-2 button { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(8px,1.2vw,11px); padding: 10px 4px; border-radius: 20px; clip-path: none; width: auto; min-width: 0; max-width: unset; }
         #tier-2.nav-row { gap: 4px; padding: 4px 6px; background: #111; }
         /* tier-3 = sub-nav row (COURSE LIST…) → CUT-CORNER */
         #tier-3 button { flex: 1; font-size: 8px; padding: 5px 8px; border-radius: 0; clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px); }
@@ -1902,18 +1902,15 @@
 
     <!-- ── HMI NAVIGATION ── -->
     <div class="nav-container">
-        <div id="tier-2" style="display:flex; flex-wrap:nowrap; overflow:hidden; width:100%; background:#111; gap:4px; padding:4px 0 4px 6px; box-sizing:border-box; align-items:center; position:relative;">
-            <!-- Scrollable buttons area -->
-            <div style="display:flex; flex:1; overflow-x:auto; overflow-y:hidden; gap:4px; align-items:center; -webkit-overflow-scrolling:touch; scrollbar-width:none; min-width:0;">
-                <button id="btn-sys"  class="active" onclick="loadTier3('System', this)" data-i18n="nav-system" style="flex:0 0 auto; font-size:10px; white-space:nowrap; border-radius:20px; padding:10px 14px;">All Program</button>
-                <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:0 0 auto; font-size:10px; white-space:nowrap; border-radius:20px; padding:10px 14px;">🗄 Database</button>
-                <button id="btn-reg"  onclick="loadTier3('RegPanel', this)" style="flex:0 0 auto; font-size:10px; white-space:nowrap; border-radius:20px; padding:10px 14px;">📋 Registration</button>
-                <button onclick="openFinanceHeadPanel()" style="flex:0 0 auto; font-size:10px; white-space:nowrap; border-radius:20px; padding:10px 14px;">💼 Finance Head</button>
-                <button onclick="openDeptHeadPanel()" style="flex:0 0 auto; font-size:10px; white-space:nowrap; border-radius:20px; padding:10px 14px;">🏛️ Dept Head</button>
-                <button onclick="openRegistrarPermPanel()" style="flex:0 0 auto; font-size:10px; white-space:nowrap; border-radius:20px; padding:10px 14px;">📝 Registrar</button>
-            </div>
-            <!-- ⋯ more menu button — always pinned to right, never scrolls -->
-            <button id="btn-more-menu" onclick="toggleMoreMenu(this)" style="flex:0 0 36px; width:36px; background:linear-gradient(180deg,#2a2000,#1a1500); color:#ffd700; border-color:#5c4500; font-size:16px; padding:0; letter-spacing:0; text-transform:none; border-radius:6px; margin-right:4px;" title="More Panels">⋯</button>
+        <div id="tier-2" style="display:flex; flex-wrap:nowrap; width:100%; background:#111; gap:4px; padding:4px 6px; box-sizing:border-box; align-items:stretch;">
+            <button id="btn-sys"  class="active" onclick="loadTier3('System', this)" data-i18n="nav-system" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">All Program</button>
+            <button id="btn-p1"   onclick="loadTier3('P1', this)" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">🗄 Database</button>
+            <button id="btn-reg"  onclick="loadTier3('RegPanel', this)" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">📋 Registration</button>
+            <button onclick="openFinanceHeadPanel()" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">💼 Finance Head</button>
+            <button onclick="openDeptHeadPanel()" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">🏛️ Dept Head</button>
+            <button onclick="openRegistrarPermPanel()" style="flex:1 1 0; min-width:0; font-size:clamp(8px,1.2vw,11px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:20px; padding:10px 4px;">📝 Registrar</button>
+            <!-- ⋯ more menu button — fixed width, always at right edge -->
+            <button id="btn-more-menu" onclick="toggleMoreMenu(this)" style="flex:0 0 32px; width:32px; background:linear-gradient(180deg,#2a2000,#1a1500); color:#ffd700; border-color:#5c4500; font-size:16px; padding:0; letter-spacing:0; text-transform:none; border-radius:6px;" title="More Panels">⋯</button>
         </div>
         <!-- More Menu Dropdown -->
         <div id="moreMenuDropdown" style="display:none; position:fixed; right:4px; top:auto; z-index:9999; background:#1a1a1a; border:2px solid #5c4500; border-radius:10px; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,0.8); padding:6px;">
