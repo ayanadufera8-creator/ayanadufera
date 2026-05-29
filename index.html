@@ -19690,16 +19690,27 @@ function _vrApply() {
 
       <!-- Attendance Log -->
       <div style="background:#0a0a0a; border:1px solid #2e7d32; border-radius:10px; padding:14px 16px; margin-bottom:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <div style="color:#81c784; font-size:0.82rem; font-weight:bold;">📋 Live Attendance Log</div>
-          <div style="display:flex; gap:6px;">
+          <div style="display:flex; gap:6px; align-items:center;">
             <input id="llAttFilterRoom" type="text" placeholder="Filter by room…"
               style="padding:3px 8px; border-radius:5px; border:1px solid #2e7d32; background:#0d1a0d; color:#81c784; font-size:0.7rem; width:110px; outline:none;"/>
             <button onclick="llLoadAttendance()" style="background:#0d1a0d; color:#81c784; border:1px solid #2e7d32; border-radius:5px; padding:3px 8px; font-size:0.7rem; cursor:pointer;">🔄 Refresh</button>
           </div>
         </div>
-        <div id="llAttendanceList" style="max-height:180px; overflow-y:auto; font-size:0.75rem; color:#aaa;">
-          <div style="text-align:center; color:#555; padding:12px;">Click Refresh to load attendance.</div>
+        <!-- Live count badge + auto-refresh status -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div id="llLiveCountBadge" style="background:#0d1a0d; border:1px solid #2e7d32; border-radius:20px; padding:3px 10px; font-size:0.72rem; color:#81c784; display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:7px;height:7px;background:#81c784;border-radius:50%;display:inline-block;animation:llPulse 1.5s infinite;"></span>
+            <span id="llLiveCountText">— students online</span>
+          </div>
+          <div id="llAutoRefreshStatus" style="font-size:0.65rem; color:#555;">⏱ Auto-refresh on</div>
+        </div>
+        <style>
+          @keyframes llPulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+        </style>
+        <div id="llAttendanceList" style="max-height:220px; overflow-y:auto; font-size:0.75rem; color:#aaa;">
+          <div style="text-align:center; color:#555; padding:12px;">Loading attendance…</div>
         </div>
       </div>
 
@@ -19772,6 +19783,7 @@ async function llTeacherLogin() {
         document.getElementById('llTeacherPwInput').value = '';
         msg.textContent = '';
         llLoadMySessions();
+        llStartAutoRefresh(); // ← auto-refresh attendance every 10s
     } else {
         msg.textContent = '❌ Incorrect password.';
     }
@@ -19781,6 +19793,7 @@ function llTeacherLogout() {
     window._llLoggedIn = false;
     document.getElementById('llTeacherGate').style.display = 'block';
     document.getElementById('llInstructorDash').style.display = 'none';
+    llStopAutoRefresh(); // ← stop refresh on logout
 }
 
 function llSanitizeRoomCode(raw) {
@@ -19863,10 +19876,53 @@ async function llStartSession() {
 
 function llOpenJitsi(roomCode, topic) {
     const displayName = 'RVU Instructor';
-    const url = 'https://meet.jit.si/' + encodeURIComponent(roomCode)
+    const webUrl = 'https://meet.jit.si/' + encodeURIComponent(roomCode)
               + '#userInfo.displayName=' + encodeURIComponent(displayName)
               + (topic ? '&config.subject=' + encodeURIComponent('RVU: ' + topic) : '');
-    window.open(url, '_blank');
+    const appIntent = 'intent://meet.jit.si/' + encodeURIComponent(roomCode)
+              + '#userInfo.displayName=' + encodeURIComponent(displayName)
+              + '#Intent;scheme=https;package=org.jitsi.meet;S.browser_fallback_url='
+              + encodeURIComponent(webUrl) + ';end';
+    llShowJitsiChoice(appIntent, webUrl);
+}
+
+function llShowJitsiChoice(appIntent, webUrl) {
+    // ── Auto-launch: try the Jitsi app first; fall back to Chrome/browser ──
+    // Remove any existing dialog
+    const old = document.getElementById('_jitsiChoiceDlg');
+    if (old) old.remove();
+
+    // On Android the intent:// URL launches the app if installed, or triggers
+    // the browser_fallback_url (webUrl) automatically if it is not.
+    // On iOS / desktop we fall straight through to window.open(webUrl).
+    const isAndroid = /android/i.test(navigator.userAgent);
+
+    if (isAndroid) {
+        // Try the app intent; the browser_fallback_url inside the intent
+        // string will open Chrome automatically if the app is not installed.
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        const launchStart = Date.now();
+        try {
+            // location.href triggers the intent on Android Chrome
+            window.location.href = appIntent;
+        } catch(e) {}
+        // After a short delay, if the app did NOT take focus (i.e. the app was
+        // not installed AND the fallback didn't fire via the intent string),
+        // open the web URL ourselves.
+        setTimeout(() => {
+            // If the page is still visible the app wasn't launched
+            if (document.hidden) return; // app opened — do nothing
+            if (Date.now() - launchStart < 2500) {
+                window.open(webUrl, '_blank');
+            }
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        }, 1800);
+    } else {
+        // iOS / desktop — open in browser directly (Jitsi web works everywhere)
+        window.open(webUrl, '_blank');
+    }
 }
 
 async function llStudentJoin() {
@@ -20043,11 +20099,18 @@ async function llStudentJoin() {
             joinedAtDisplay: now.toLocaleString()
         });
 
+        // ── Start presence heartbeat so teacher sees green dot ──
+        llStartPresence(studentId, roomCode);
+
         msg.style.color = '#4caf50';
         msg.textContent = '✅ Verified! Opening session for ' + studentId.toUpperCase() + '…';
-        const url = 'https://meet.jit.si/' + encodeURIComponent(roomCode)
-                  + '#userInfo.displayName=' + encodeURIComponent('Student: ' + studentId.toUpperCase());
-        window.open(url, '_blank');
+        const _sRc = encodeURIComponent(roomCode);
+        const _sDn = encodeURIComponent('Student: ' + studentId.toUpperCase());
+        const _sWebUrl = 'https://meet.jit.si/' + _sRc + '#userInfo.displayName=' + _sDn;
+        const _sIntent = 'intent://meet.jit.si/' + _sRc + '#userInfo.displayName=' + _sDn
+                  + '#Intent;scheme=https;package=org.jitsi.meet;S.browser_fallback_url='
+                  + encodeURIComponent(_sWebUrl) + ';end';
+        llShowJitsiChoice(_sIntent, _sWebUrl);
 
     } catch(e) {
         console.error('llStudentJoin error:', e);
@@ -20089,7 +20152,7 @@ async function llLoadMySessions() {
             // Compute elapsed or scheduled label for card
             let timerBadge = '';
             if (d.lectureStartedAt) {
-                const elSec = Math.floor((Date.now() - new Date(d.lectureStartedAt).getTime()) / 1000);
+                const elSec = Math.max(0, Math.floor((Date.now() - new Date(d.lectureStartedAt).getTime()) / 1000));
                 const eh = String(Math.floor(elSec/3600)).padStart(2,'0');
                 const em = String(Math.floor((elSec%3600)/60)).padStart(2,'0');
                 const es = String(elSec%60).padStart(2,'0');
@@ -20597,8 +20660,9 @@ async function llBeginLecture() {
     status.style.display     = 'none';
     elapsedBlk.style.display = 'block';
 
-    // Save lectureStartedAt to Firebase
-    const startedAt = new Date().toISOString();
+    // Save lectureStartedAt to Firebase using UTC ISO string
+    const startMs = Date.now();
+    const startedAt = new Date(startMs).toISOString(); // always UTC
     if (window.db && window._llCurrentRoomCode) {
         try {
             await window.db.collection('hmi_livelectures').doc(window._llCurrentRoomCode)
@@ -20606,55 +20670,177 @@ async function llBeginLecture() {
         } catch(e) { console.warn('Could not save lectureStartedAt', e); }
     }
 
-    const startMs = Date.now();
     function elapsedTick() {
-        const secs = Math.floor((Date.now() - startMs) / 1000);
+        const secs = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
         elapsedDisp.textContent = llFmtTime(secs);
     }
     elapsedTick();
     window._llElapsedTimer = setInterval(elapsedTick, 1000);
+
+    // ── Auto-open Jitsi for instructor when Begin is clicked ──
+    if (window._llCurrentRoomCode) {
+        const _rc = encodeURIComponent(window._llCurrentRoomCode);
+        const _dn = encodeURIComponent('RVU Instructor');
+        const _webUrl = 'https://meet.jit.si/' + _rc
+            + '#userInfo.displayName=' + _dn
+            + '&config.startWithVideoMuted=false';
+        const _appIntent = 'intent://meet.jit.si/' + _rc
+            + '#userInfo.displayName=' + _dn
+            + '#Intent;scheme=https;package=org.jitsi.meet;S.browser_fallback_url='
+            + encodeURIComponent(_webUrl) + ';end';
+        llShowJitsiChoice(_appIntent, _webUrl);
+    }
 }
 
 
 async function llLoadAttendance() {
-    const list     = document.getElementById('llAttendanceList');
-    const filter   = (document.getElementById('llAttFilterRoom').value || '').trim().toUpperCase();
+    const list   = document.getElementById('llAttendanceList');
+    const filter = (document.getElementById('llAttFilterRoom').value || '').trim().toUpperCase();
     if (!list) return;
     if (!window.db) {
         list.innerHTML = '<div style="text-align:center; color:#555; padding:12px;">Firebase not available.</div>';
         return;
     }
     try {
-        list.innerHTML = '<div style="text-align:center; color:#555; padding:8px;">Loading…</div>';
-        let query = window.db.collection('hmi_live_attendance').orderBy('joinedAt', 'desc').limit(100);
+        let query = window.db.collection('hmi_live_attendance').orderBy('joinedAt', 'desc').limit(200);
         const snap = await query.get();
+
+        // ── Also load presence heartbeats to know who is currently live ──
+        let liveSet = new Set();
+        try {
+            const now = Date.now();
+            const presSnap = await window.db.collection('hmi_live_presence').get();
+            presSnap.forEach(doc => {
+                const d = doc.data();
+                // Consider a student "live" if their heartbeat is within 90 seconds
+                if (d.lastSeen && (now - new Date(d.lastSeen).getTime()) < 90000) {
+                    liveSet.add(doc.id); // doc.id = studentId_roomCode
+                }
+            });
+        } catch(e) { /* presence collection may not exist yet */ }
+
+        // Update live count badge
+        const badge = document.getElementById('llLiveCountText');
+        if (badge) badge.textContent = liveSet.size + ' student' + (liveSet.size !== 1 ? 's' : '') + ' online';
+
         if (snap.empty) {
             list.innerHTML = '<div style="text-align:center; color:#555; padding:12px;">No attendance records yet.</div>';
             return;
         }
+
         let rows = '';
         let count = 0;
         snap.forEach(doc => {
             const d = doc.data();
             if (filter && !d.roomCode.includes(filter)) return;
             count++;
+            const presKey = (d.studentId + '_' + d.roomCode).toUpperCase();
+            const isLive  = liveSet.has(presKey);
+            const statusDot = isLive
+                ? '<span style="display:inline-block;width:7px;height:7px;background:#81c784;border-radius:50%;margin-right:4px;animation:llPulse 1.5s infinite;"></span>'
+                : '<span style="display:inline-block;width:7px;height:7px;background:#444;border-radius:50%;margin-right:4px;"></span>';
+            const leftInfo = d.leftAt
+                ? `<span style="color:#e57373; font-size:0.65rem; margin-left:6px;">left ${d.leftAtDisplay || d.leftAt}</span>`
+                : (isLive ? '<span style="color:#81c784; font-size:0.65rem; margin-left:6px;">● live</span>' : '');
             rows += `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-bottom:1px solid #1a1a1a; font-size:0.72rem;">
-              <div>
+              <div style="display:flex; align-items:center;">
+                ${statusDot}
                 <span style="color:#00e5ff; font-weight:bold;">${d.studentId}</span>
                 <span style="color:#555; margin-left:6px;">${d.roomCode}</span>
+                ${leftInfo}
               </div>
-              <div style="color:#555; font-size:0.68rem; white-space:nowrap;">${d.joinedAtDisplay || d.joinedAt}</div>
+              <div style="color:#555; font-size:0.65rem; white-space:nowrap;">${d.joinedAtDisplay || d.joinedAt}</div>
             </div>`;
         });
+
         if (!count) {
             list.innerHTML = '<div style="text-align:center; color:#555; padding:12px;">No records match that room code.</div>';
         } else {
-            list.innerHTML = `<div style="color:#555; font-size:0.68rem; padding:4px 8px; margin-bottom:4px;">${count} record(s)</div>` + rows;
+            list.innerHTML = `<div style="color:#555; font-size:0.68rem; padding:4px 8px; margin-bottom:4px;">${count} record(s) — 🟢 live shown with green dot</div>` + rows;
         }
     } catch(e) {
         list.innerHTML = '<div style="text-align:center; color:#cc4400; padding:8px;">Error loading attendance.</div>';
         console.error(e);
     }
+}
+
+/* ══════════════════════════════════════════════════════
+   LIVE PRESENCE — Student heartbeat (every 30 s)
+   Key: studentId_roomCode  →  { lastSeen, studentId, roomCode }
+══════════════════════════════════════════════════════ */
+window._llPresenceTimer   = null;
+window._llPresenceKey     = null;
+window._llPresenceRoom    = null;
+
+function llStartPresence(studentId, roomCode) {
+    if (!window.db) return;
+    const key = (studentId + '_' + roomCode).toUpperCase();
+    window._llPresenceKey  = key;
+    window._llPresenceRoom = roomCode;
+
+    async function beat() {
+        try {
+            await window.db.collection('hmi_live_presence').doc(key).set({
+                studentId:  studentId.toUpperCase(),
+                roomCode:   roomCode,
+                lastSeen:   new Date().toISOString()
+            });
+        } catch(e) {}
+    }
+    beat(); // immediate first beat
+    if (window._llPresenceTimer) clearInterval(window._llPresenceTimer);
+    window._llPresenceTimer = setInterval(beat, 30000);
+}
+
+async function llStopPresence() {
+    if (window._llPresenceTimer) { clearInterval(window._llPresenceTimer); window._llPresenceTimer = null; }
+    if (!window.db || !window._llPresenceKey) return;
+    // Mark leftAt on the attendance record
+    try {
+        const now = new Date();
+        const snap = await window.db.collection('hmi_live_attendance')
+            .where('studentId', '==', window._llPresenceKey.split('_')[0])
+            .where('roomCode',  '==', window._llPresenceRoom)
+            .orderBy('joinedAt', 'desc').limit(1).get();
+        if (!snap.empty) {
+            await snap.docs[0].ref.update({
+                leftAt:        now.toISOString(),
+                leftAtDisplay: now.toLocaleString()
+            });
+        }
+        // Remove presence heartbeat doc
+        await window.db.collection('hmi_live_presence').doc(window._llPresenceKey).delete();
+    } catch(e) {}
+    window._llPresenceKey  = null;
+    window._llPresenceRoom = null;
+}
+
+// Stop presence when student closes/leaves the page
+window.addEventListener('beforeunload', () => { llStopPresence(); });
+window.addEventListener('pagehide',     () => { llStopPresence(); });
+
+/* ══════════════════════════════════════════════════════
+   AUTO-REFRESH — Teacher attendance panel every 10 s
+══════════════════════════════════════════════════════ */
+window._llAutoRefreshTimer = null;
+
+function llStartAutoRefresh() {
+    llLoadAttendance(); // load immediately
+    if (window._llAutoRefreshTimer) clearInterval(window._llAutoRefreshTimer);
+    window._llAutoRefreshTimer = setInterval(() => {
+        const dash = document.getElementById('llInstructorDash');
+        if (dash && dash.style.display !== 'none') {
+            llLoadAttendance();
+        }
+    }, 10000);
+    const st = document.getElementById('llAutoRefreshStatus');
+    if (st) st.textContent = '⏱ Auto-refresh every 10s';
+}
+
+function llStopAutoRefresh() {
+    if (window._llAutoRefreshTimer) { clearInterval(window._llAutoRefreshTimer); window._llAutoRefreshTimer = null; }
+    const st = document.getElementById('llAutoRefreshStatus');
+    if (st) st.textContent = '⏱ Auto-refresh off';
 }
 </script>
 
