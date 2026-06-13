@@ -1182,7 +1182,7 @@
                 <title>${title}</title>
                 <style>
                     * { box-sizing: border-box; }
-                    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #fff; font-size: 12px; }
+                    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #000; font-size: 12px; }
                     .print-header {
                         background: #1a3a5c;
                         color: #fff;
@@ -1250,9 +1250,9 @@
                     .print-body { padding: 18px 24px; }
                     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
                     th { background: #1a3a5c; color: #fff; padding: 7px 8px; text-align: left; border: 1px solid #999; }
-                    td { padding: 5px 8px; border: 1px solid #ccc; background: #fff !important; color: #fff !important; }
-                    tr:nth-child(even) td { background: #f4f7fb !important; color: #fff !important; }
-                    td * { color: #fff !important; background: transparent !important; }
+                    td { padding: 5px 8px; border: 1px solid #ccc; background: #fff !important; color: #000 !important; }
+                    tr:nth-child(even) td { background: #f4f7fb !important; color: #000 !important; }
+                    td * { color: #000 !important; background: transparent !important; }
                     td span { color: inherit !important; background: transparent !important; border-color: #ccc !important; }
                     td span[style*="color:#00a2ff"], td span[style*="color: #00a2ff"] { color: #0066cc !important; }
                     td span[style*="color:#ffd700"], td span[style*="color: #ffd700"] { color: #b8860b !important; }
@@ -1262,22 +1262,22 @@
                     td[style*="color:#ffd700"] { color: #b8860b !important; }
                     td[style*="color:#4caf50"] { color: #2e7d32 !important; }
                     /* Audit log: color columns by position for readability */
-                    td:nth-child(1) { color: #fff !important; }
+                    td:nth-child(1) { color: #000 !important; }
                     td:nth-child(2) { color: #0055aa !important; font-weight: 600; }
                     td:nth-child(3) { color: #1a6b2e !important; font-weight: 600; }
-                    td:nth-child(4) { color: #fff !important; }
+                    td:nth-child(4) { color: #000 !important; }
                     td[style*="color:#ffae00"] { color: #e65100 !important; }
-                    td[style*="color:#fff"], td[style*="color: #fff"] { color: #fff !important; }
+                    td[style*="color:#fff"], td[style*="color: #fff"] { color: #000 !important; }
                     /* Force all td/span dark backgrounds to white in print */
                     td[style*="background:#1e1e1e"], td[style*="background:#252525"],
                     td[style*="background:#1a2a1a"], td[style*="background:#1a3a1a"],
-                    td[style*="background:#003366"], td[style*="background:#2a2000"] { background: #fff !important; color: #fff !important; }
-                    td[style*="color:#fff"] { color: #fff !important; }
+                    td[style*="background:#003366"], td[style*="background:#2a2000"] { background: #fff !important; color: #000 !important; }
+                    td[style*="color:#fff"] { color: #000 !important; }
                     td span[style*="background:#003366"] { background: #e8f0fe !important; color: #0066cc !important; border-color: #0066cc !important; }
                     td span[style*="background:#2a2000"] { background: #fff8e1 !important; color: #b8860b !important; border-color: #b8860b !important; }
                     td span[style*="background:#1a3a1a"] { background: #e8f5e9 !important; color: #2e7d32 !important; border-color: #2e7d32 !important; }
                     .sql-table-wrap { overflow: visible; }
-                    .print-footer { margin-top: 24px; border-top: 1px solid #ccc; padding-top: 8px; color: #fff; font-size: 10px; text-align: center; }
+                    .print-footer { margin-top: 24px; border-top: 1px solid #ccc; padding-top: 8px; color: #000; font-size: 10px; text-align: center; }
                     /* Semester label headings in grades/scores print */
                     div[style*="border-left:3px solid"] {
                         border-left-width: 3px !important;
@@ -13284,7 +13284,22 @@
             var el = document.getElementById('teacherHomeDeptDisplay');
             if (!el) return;
             var tid = (val || '').trim();
-            if (!tid) { el.innerHTML = ''; return; }
+            if (!tid) {
+                el.innerHTML = '';
+                /* Reset dropdown to full list when ID is cleared */
+                var selReset = document.getElementById('teacherDeptSel');
+                if (selReset) {
+                    var prevVal = selReset.value;
+                    selReset.innerHTML = '<option value="">-- Select Your Department --</option>';
+                    getDeptList().forEach(function(d) {
+                        var o = document.createElement('option');
+                        o.value = d; o.textContent = d;
+                        if (d === prevVal) o.selected = true;
+                        selReset.appendChild(o);
+                    });
+                }
+                return;
+            }
             function _show() {
                 var teachers = (window._hmsData && window._hmsData.teachers) ? window._hmsData.teachers : [];
                 var t = teachers.find(function(x){ return String(x.teacherId||'').trim().toLowerCase() === tid.toLowerCase(); });
@@ -13293,11 +13308,50 @@
                     homeDeptHtml = '🏠 <strong style="color:#81c784;">' + t.department + '</strong>';
                 } else {
                     el.innerHTML = '<span style="color:#fff; font-size:0.78rem;">ID not found</span>';
+                    /* Reset dropdown to full list if ID not found */
+                    var selErr = document.getElementById('teacherDeptSel');
+                    if (selErr) {
+                        selErr.innerHTML = '<option value="">-- Select Your Department --</option>';
+                        getDeptList().forEach(function(d) {
+                            var o = document.createElement('option');
+                            o.value = d; o.textContent = d;
+                            selErr.appendChild(o);
+                        });
+                    }
                     return;
                 }
                 var selDept = (document.getElementById('teacherDeptSel') || {}).value || '';
                 var assignments = (window._hmsData && window._hmsData.courseAssignments) ? window._hmsData.courseAssignments : [];
                 var homeDept = (t.department||'').trim().toLowerCase();
+
+                /* ── Filter department dropdown: home dept + depts with course assignments ── */
+                (function() {
+                    var sel = document.getElementById('teacherDeptSel');
+                    if (!sel) return;
+                    function normStr2(s){ return String(s||'').trim().replace(/&amp;/gi,'&').toLowerCase(); }
+                    var tidNorm2 = normStr2(tid);
+                    /* Collect all depts this teacher is assigned courses in */
+                    var assignedDepts = assignments
+                        .filter(function(a){ return normStr2(a.teacherId) === tidNorm2 && a.department; })
+                        .map(function(a){ return a.department.trim(); });
+                    /* Build allowed set: home dept + assigned depts (case-insensitive dedup) */
+                    var allowedMap = {};
+                    allowedMap[normStr2(t.department)] = t.department; /* home dept — use canonical name */
+                    assignedDepts.forEach(function(d){ allowedMap[normStr2(d)] = d; });
+                    var allowedList = Object.values(allowedMap).sort();
+                    /* Preserve current selection if still valid */
+                    var prevSel = sel.value;
+                    sel.innerHTML = '<option value="">-- Select Your Department --</option>';
+                    allowedList.forEach(function(d) {
+                        var o = document.createElement('option');
+                        o.value = d; o.textContent = d;
+                        /* Auto-select home dept if nothing was selected, or restore valid selection */
+                        if (d === prevSel || (!prevSel && normStr2(d) === normStr2(t.department))) {
+                            o.selected = true;
+                        }
+                        sel.appendChild(o);
+                    });
+                })();
 
                 /* Normalise helper — strips whitespace and decodes &amp; so
                    "Accounting &amp; Finance" === "Accounting & Finance" */
