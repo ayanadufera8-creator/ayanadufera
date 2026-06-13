@@ -1358,6 +1358,27 @@
             w.focus();
         }
 
+        /* ── PRINT: columns to keep (lowercase) and their abbreviations for student tables ── */
+        const _STUDENT_PRINT_COLS = {
+            'student id':              'SID',
+            'full name':               'Full Name',
+            'age':                     'Age',
+            'sex':                     'Sex',
+            'country':                 'Country',
+            'region':                  'Region',
+            'town':                    'Town',
+            'kebele':                  'Kebele',
+            'entrance completion year':'ECYear',
+            'entrance score':          'Ent. Score',
+            'national id':             'NID',
+            'phone':                   'Phone',
+            'level':                   'Level',
+            'classification':          'Class.',
+            'department':              'Dept.',
+            'year':                    'Year',
+            'semester':                'Sem.',
+        };
+
         /* ── safePrint: strips buttons/action cols, sends only clean table(s) to printSection ── */
         function safePrint(title, sourceEl) {
             if (!sourceEl) return;
@@ -1373,6 +1394,12 @@
             let combined = '';
             const tables = root.querySelectorAll('table');
             if (!tables.length) return;
+
+            /* Detect whether this is a student/registration print */
+            /* Match student table prints: SQL view title, Dept Head title, Registrar 'Student List' title */
+            const _isStudentPrint = /\bstudents\b|reg_diploma|reg_degree|reg_masters|reg_phd/i.test(title) ||
+                /^Students[\s\u2014›]/i.test(title) || /^Student List[\s\u2014›]/i.test(title);
+
             tables.forEach(tbl => {
                 /* Sem label removed — full context already shown in yellow title bar */
                 /* Drop DEL / DELETE / ACTION / APPROVE — works with or without <thead> */
@@ -1382,8 +1409,20 @@
                 const dropIndices = new Set();
                 headerCells.forEach((th, i) => {
                     const txt = th.textContent.trim().toUpperCase();
+                    const lower = th.textContent.trim().toLowerCase();
                     const hasOnlyCb = th.querySelector('input[type="checkbox"]') && th.textContent.trim() === '';
-                    if (txt === 'DEL' || txt === 'DELETE' || txt === 'APPROVE' || txt === 'DOC FILE' || hasOnlyCb) dropIndices.add(i);
+                    /* Always drop action/meta cols */
+                    if (txt === 'DEL' || txt === 'DELETE' || txt === 'APPROVE' || txt === 'DOC FILE' || txt === 'ENROLLMENT' || hasOnlyCb) {
+                        dropIndices.add(i); return;
+                    }
+                    /* For student tables: keep only the allowed print columns */
+                    if (_isStudentPrint && !Object.prototype.hasOwnProperty.call(_STUDENT_PRINT_COLS, lower)) {
+                        dropIndices.add(i); return;
+                    }
+                    /* Rename to abbreviation */
+                    if (_isStudentPrint && _STUDENT_PRINT_COLS[lower]) {
+                        th.textContent = _STUDENT_PRINT_COLS[lower];
+                    }
                 });
                 if (dropIndices.size) {
                     clone.querySelectorAll('tr').forEach(tr => {
@@ -2959,13 +2998,13 @@
             .handwritten-sig { color: #2b3d8c !important; -webkit-print-color-adjust: exact; border-color: #2b3d8c !important; }
         }
 
-        @media (max-width: 768px) {
-            /* Wrap sql-table in a scrollable container — keep the table itself as a
-               proper HTML table so th/td widths always stay in sync */
-            .sql-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; }
-            .sql-table { display:table; width:max-content; min-width:100%; white-space:nowrap; }
-            .sql-table th, .sql-table td { white-space:nowrap; }
-        }
+        /* Wrap sql-table in a scrollable container — keep the table itself as a
+           proper HTML table so th/td widths always stay in sync.
+           Applied at ALL viewport widths (not just mobile) so admin/registrar
+           desktop views can also scroll horizontally to see all columns. */
+        .sql-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; }
+        .sql-table { display:table; width:max-content; min-width:100%; white-space:nowrap; }
+        .sql-table th, .sql-table td { white-space:nowrap; }
     </style>
 
     <!-- ── SILENT GOOGLE TRANSLATE INTEGRATION (no top bar) ── -->
@@ -12705,6 +12744,7 @@
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">${typeTabs}</div>
                     <div id="rdDeptWrap" style="position:relative; display:inline-block;"></div>
                     ${filterSelects}
+                    <button onclick="uniSearchOpen()" style="padding:5px 12px;border-radius:6px;border:1.5px solid #00a2ff;background:#001a33;color:#00a2ff;font-size:0.75rem;font-weight:bold;cursor:pointer;text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:4px;">🔍 Search by ID</button>
                     <button onclick="regDataPrint()" style="margin-left:auto; padding:5px 12px; background:#1a3a5c; color:#4fc3f7; border:1px solid #4fc3f7; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:bold; text-transform:none; letter-spacing:0;">🖨️ Print</button>
                 </div>
                 <div id="regDataContent"></div>`;
@@ -21778,24 +21818,41 @@ function uniSearchRun() {
         const score  = s['entrance score'] || s.score || '—';
         const sid    = s['student id'] || raw;
 
+        /* ── Resolve student photo (stored URL, else Cloudinary by ID, else initials avatar) ── */
+        let photoUrl = s.photo_url || s.photoUrl || s.photo || '';
+        if (!photoUrl && sid && window.CLOUDINARY_CLOUD_NAME) {
+            const _safeid = String(sid).replace(/\//g, '_');
+            photoUrl = 'https://res.cloudinary.com/' + window.CLOUDINARY_CLOUD_NAME +
+                '/image/upload/rvu_student_photos/students/' + _safeid + '.jpg';
+        }
+        const _initials = (name || sid || '?').toString().trim().split(/\s+/).map(w => w[0]||'').join('').slice(0,2).toUpperCase() || '?';
+        const _avatarFallback = `<div style="width:84px;height:84px;border-radius:10px;background:#004d66;border:2px solid #00a2ff;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:bold;color:#fff;flex-shrink:0;">${_initials}</div>`;
+        const photoHtml = photoUrl
+            ? `<img src="${photoUrl}" alt="${name}" style="width:84px;height:84px;border-radius:10px;object-fit:cover;border:2px solid #00a2ff;flex-shrink:0;background:#000;"
+                  onerror="if(this.src.indexOf('.jpg')!==-1){this.onerror=function(){this.outerHTML='${_avatarFallback.replace(/'/g,"\\'")}';};this.src=this.src.replace('.jpg','.png');}else{this.outerHTML='${_avatarFallback.replace(/'/g,"\\'")}';}">`
+            : _avatarFallback;
+
         html += `<div style="background:#001a33; border:1.5px solid #00a2ff; border-radius:12px; padding:16px; margin-bottom:14px;">
             <div style="color:#00a2ff; font-weight:bold; font-size:0.88rem; margin-bottom:12px; letter-spacing:0.5px;">
                 🎓 STUDENT PROFILE ${student ? '<span style="color:#4caf50; font-size:0.72rem; margin-left:6px;">● Main DB</span>' : ''} ${regEntry ? '<span style="color:#ffae00; font-size:0.72rem; margin-left:4px;">● Registration DB</span>' : ''}
             </div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px;">
-                ${uniChip('Student ID', sid, '#ffd700')}
-                ${uniChip('Full Name', name, '#fff')}
-                ${uniChip('Department', dept, '#00e5e5')}
-                ${uniChip('Classification', cls, '#ce93d8')}
-                ${uniChip('Level', level, '#81c784')}
-                ${uniChip('Year', year, '#4caf50')}
-                ${uniChip('Semester', sem, '#4caf50')}
-                ${uniChip('Sex', sex, '#aaa')}
-                ${uniChip('Age', age, '#aaa')}
-                ${uniChip('Region', region, '#aaa')}
-                ${uniChip('Town', town, '#aaa')}
-                ${uniChip('Entrance Score', score !== '—' ? score+'/700' : '—', score !== '—' ? '#ffd700' : '#555')}
-                ${uniChip('Reg. Date', date, '#aaa')}
+            <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+                ${photoHtml}
+                <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; flex:1; min-width:200px;">
+                    ${uniChip('Student ID', sid, '#ffd700')}
+                    ${uniChip('Full Name', name, '#fff')}
+                    ${uniChip('Department', dept, '#00e5e5')}
+                    ${uniChip('Classification', cls, '#ce93d8')}
+                    ${uniChip('Level', level, '#81c784')}
+                    ${uniChip('Year', year, '#4caf50')}
+                    ${uniChip('Semester', sem, '#4caf50')}
+                    ${uniChip('Sex', sex, '#aaa')}
+                    ${uniChip('Age', age, '#aaa')}
+                    ${uniChip('Region', region, '#aaa')}
+                    ${uniChip('Town', town, '#aaa')}
+                    ${uniChip('Entrance Score', score !== '—' ? score+'/700' : '—', score !== '—' ? '#ffd700' : '#555')}
+                    ${uniChip('Reg. Date', date, '#aaa')}
+                </div>
             </div>
         </div>`;
     }
